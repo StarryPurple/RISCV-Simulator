@@ -1,0 +1,4 @@
+#ifndef ISM_PREDICTOR_H
+#define ISM_PREDICTOR_H
+
+#endif // ISM_PREDICTOR_H
