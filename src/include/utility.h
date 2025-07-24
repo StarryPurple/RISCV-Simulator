@@ -7,14 +7,14 @@
 namespace insomnia {
 
 // sign extension. Len is for the expected digit number of the value.
-template <class T, int Len> requires std::is_integral_v<T>
-T sext(T val) {
+template <std::integral T, int Len>
+T sign_extend(T val) {
   return (val & (1 << (Len - 1))) ? (val | (-1u << val)) : (val & ~(-1u << val));
 }
 
 // sign extension. Len is for the expected digit number of the value.
-template <class T, int Len> requires std::is_integral_v<T>
-T sext(T val, bool is_one) {
+template <std::integral T, int Len>
+T sign_extend(T val, bool is_one) {
   return is_one ? (val | (-1u << val)) : (val & ~(-1u << val));
 }
 
@@ -29,12 +29,38 @@ inline int hex2dec(char c) {
   throw std::runtime_error("invalid hex character.");
 }
 
-template <class T> requires std::is_integral_v<T>
+template <std::integral T>
 T hex2dec(const char *str) {
   T res = 0;
   while(!is_delim(*str))
     res = (res << 4) | hex2dec(*str++);
   return res;
+}
+
+
+template <std::integral To, int High, int Low, std::integral From>
+requires
+  (High >= Low) &&
+  (High < std::numeric_limits<From>::digits) &&
+  (Low >= 0) &&
+  (High - Low + 1 <= std::numeric_limits<To>::digits)
+To slice_bytes(From val) {
+  constexpr From mask = ((static_cast<From>(1) << (High - Low + 1)) - 1) << Low;
+  return static_cast<To>((val & mask) >> Low);
+}
+
+// concatenate the lower digits of two values
+template <std::integral To, int Len1, int Len2, std::integral Left, std::integral Right>
+requires
+  (Len1 >= 0) && (Len2 >= 0) &&
+  (Len1 <= std::numeric_limits<Left>::digits) &&
+  (Len2 <= std::numeric_limits<Right>::digits) &&
+  (Len1 + Len2 <= std::numeric_limits<To>::digits)
+To concate_bytes(Left left, Right right) {
+  constexpr Left left_mask = (static_cast<Left>(1) << Len1) - 1;
+  constexpr Right right_mask = (static_cast<Right>(1) << Len2) - 1;
+  return (static_cast<To>(left & left_mask) << Len2) |
+          static_cast<To>(right & right_mask);
 }
 
 }
