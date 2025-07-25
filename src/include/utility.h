@@ -29,15 +29,6 @@ inline int hex2dec(char c) {
   throw std::runtime_error("invalid hex character.");
 }
 
-template <std::integral T>
-T hex2dec(const char *str) {
-  T res = 0;
-  while(!is_delim(*str))
-    res = (res << 4) | hex2dec(*str++);
-  return res;
-}
-
-
 template <std::integral To, int High, int Low, std::integral From>
 requires
   (High >= Low) &&
@@ -49,6 +40,15 @@ To slice_bytes(From val) {
   return static_cast<To>((val & mask) >> Low);
 }
 
+inline uint32_t ToSmallEndian32_8(uint32_t bigEndian) {
+  auto s7_0 = slice_bytes<uint32_t, 31, 24>(bigEndian);
+  auto s15_8 = slice_bytes<uint32_t, 23, 16>(bigEndian);
+  auto s23_16 = slice_bytes<uint32_t, 15, 8>(bigEndian);
+  auto s31_24 = slice_bytes<uint32_t, 7, 0>(bigEndian);
+  return (s31_24 << 24) | (s23_16 << 16) | (s15_8 << 8) | (s7_0 << 0);
+}
+
+/*
 // concatenate the lower digits of two values
 template <std::integral To, int Len1, int Len2, std::integral Left, std::integral Right>
 requires
@@ -56,12 +56,13 @@ requires
   (Len1 <= std::numeric_limits<Left>::digits) &&
   (Len2 <= std::numeric_limits<Right>::digits) &&
   (Len1 + Len2 <= std::numeric_limits<To>::digits)
-To concate_bytes(Left left, Right right) {
+To concat_bytes(Left left, Right right) {
   constexpr Left left_mask = (static_cast<Left>(1) << Len1) - 1;
   constexpr Right right_mask = (static_cast<Right>(1) << Len2) - 1;
   return (static_cast<To>(left & left_mask) << Len2) |
           static_cast<To>(right & right_mask);
 }
+*/
 
 }
 

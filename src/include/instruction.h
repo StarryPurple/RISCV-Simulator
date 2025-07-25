@@ -7,11 +7,12 @@
 #include "common.h"
 #include "utility.h"
 
-namespace insomnia {
-
 /********************** instruction codes ***********************/
 
+namespace insomnia {
+
 enum class InstrType {
+  INVALID,
   LUI, AUIPC,
   JAL, JALR,
   BEQ, BNE, BLT, BGE, BLTU, BGEU,
@@ -102,80 +103,85 @@ enum class srl_sra_code : uint8_t {
   srA = 0b0100000,
 };
 
+// Decoder integrated as function resolve(instr).
 class Instruction {
 public:
   Instruction() = default;
-  explicit Instruction(raw_instr_t instr) : _instr(instr) { parse(); }
+  explicit Instruction(raw_instr_t instr) { resolve(instr); }
 
-  void parse() {
-    _fields.funct3    = slice_bytes<uint8_t, 14, 12>(_instr);
-    _fields.funct7    = slice_bytes<uint8_t, 31, 25>(_instr);
-    _fields.rs2_shamt = slice_bytes<uint8_t, 24, 20>(_instr);
-    _fields.rs1       = slice_bytes<uint8_t, 19, 15>(_instr);
-    _fields.rd        = slice_bytes<uint8_t, 11, 7>(_instr);
-    _fields.opcode    = slice_bytes<uint8_t, 6, 0>(_instr);
-    switch(static_cast<opcode_t>(_fields.opcode)) {
+  void resolve(raw_instr_t instr) {
+    _type = InstrType::INVALID;
+    _fields.rs2_shamt = slice_bytes<uint8_t, 24, 20>(instr);
+    _fields.rs1       = slice_bytes<uint8_t, 19, 15>(instr);
+    _fields.rd        = slice_bytes<uint8_t, 11,  7>(instr);
+    auto funct3 = slice_bytes<uint8_t, 14, 12>(instr);
+    auto funct7 = slice_bytes<uint8_t, 31, 25>(instr);
+    auto opcode = slice_bytes<uint8_t,  6,  0>(instr);
+    switch(static_cast<opcode_t>(opcode)) {
     case opcode_t::LUI: {
       _type = InstrType::LUI;
-      _fields.imm = slice_bytes<int32_t, 31, 12>(_instr);
+      _fields.imm = slice_bytes<int32_t, 31, 12>(instr);
     } break;
     case opcode_t::AUIPC: {
       _type = InstrType::AUIPC;
-      _fields.imm = slice_bytes<int32_t, 31, 12>(_instr);
+      _fields.imm = slice_bytes<int32_t, 31, 12>(instr);
     } break;
     case opcode_t::JAL: {
       _type = InstrType::JAL;
-      int32_t imm20    = slice_bytes<int32_t, 31, 31>(_instr);
-      int32_t imm10_1  = slice_bytes<int32_t, 30, 21>(_instr);
-      int32_t imm11    = slice_bytes<int32_t, 20, 20>(_instr);
-      int32_t imm19_12 = slice_bytes<int32_t, 19, 12>(_instr);
+      auto imm20    = slice_bytes<int32_t, 31, 31>(instr);
+      auto imm10_1  = slice_bytes<int32_t, 30, 21>(instr);
+      auto imm11    = slice_bytes<int32_t, 20, 20>(instr);
+      auto imm19_12 = slice_bytes<int32_t, 19, 12>(instr);
       _fields.imm = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
     } break;
     case opcode_t::JALR: {
       _type = InstrType::JALR;
-      _fields.imm = slice_bytes<int32_t, 31, 20>(_instr);
+      _fields.imm = slice_bytes<int32_t, 31, 20>(instr);
     } break;
     case opcode_t::B_INSTR: {
-      int32_t imm12    = slice_bytes<int32_t, 31, 31>(_instr);
-      int32_t imm10_5  = slice_bytes<int32_t, 30, 25>(_instr);
-      int32_t imm4_1   = slice_bytes<int32_t, 11, 8>(_instr);
-      int32_t imm11    = slice_bytes<int32_t, 7, 7>(_instr);
+      auto imm12    = slice_bytes<int32_t, 31, 31>(instr);
+      auto imm10_5  = slice_bytes<int32_t, 30, 25>(instr);
+      auto imm4_1   = slice_bytes<int32_t, 11,  8>(instr);
+      auto imm11    = slice_bytes<int32_t,  7,  7>(instr);
       _fields.imm = (imm12 << 12) | (imm11 << 11)| (imm10_5 << 5) | (imm4_1 << 1);
-      switch(static_cast<b_instr_code>(_fields.funct3)) {
+      switch(static_cast<b_instr_code>(funct3)) {
       case b_instr_code::BEQ:  _type = InstrType::BEQ;  break;
       case b_instr_code::BNE:  _type = InstrType::BNE;  break;
       case b_instr_code::BLT:  _type = InstrType::BLT;  break;
       case b_instr_code::BGE:  _type = InstrType::BGE;  break;
       case b_instr_code::BLTU: _type = InstrType::BLTU; break;
       case b_instr_code::BGEU: _type = InstrType::BGEU; break;
-      default: throw std::runtime_error("instruction parse error: unrecognizable B-instruction code.");
+      default: break;
+        // throw std::runtime_error("instruction parse error: unrecognizable B-instruction code.");
       }
     }  break;
     case opcode_t::L_INSTR: {
-      _fields.imm = slice_bytes<int32_t, 31, 20>(_instr);
-      switch(static_cast<l_instr_code>(_fields.funct3)) {
+      _fields.imm = slice_bytes<int32_t, 31, 20>(instr);
+      switch(static_cast<l_instr_code>(funct3)) {
       case l_instr_code::LB:  _type = InstrType::LB;  break;
       case l_instr_code::LH:  _type = InstrType::LH;  break;
       case l_instr_code::LW:  _type = InstrType::LW;  break;
       case l_instr_code::LBU: _type = InstrType::LBU; break;
       case l_instr_code::LHU: _type = InstrType::LHU; break;
-      default: throw std::runtime_error("instruction parse error: unrecognizable I (load)-instruction code.");
+      default: break;
+        // throw std::runtime_error("instruction parse error: unrecognizable I (load)-instruction code.");
       }
     } break;
     case opcode_t::S_INSTR: {
-      int32_t imm11_5 = slice_bytes<int32_t, 31, 25>(_instr);
-      int32_t imm4_0  = slice_bytes<int32_t, 11, 7>(_instr);
+      auto imm11_5 = slice_bytes<int32_t, 31, 25>(instr);
+      auto imm4_0  = slice_bytes<int32_t, 11,  7>(instr);
       _fields.imm = (imm11_5 << 5) | (imm4_0 << 0);
-      switch(static_cast<s_instr_code>(_fields.funct3)) {
+      switch(static_cast<s_instr_code>(funct3)) {
       case s_instr_code::SB: _type = InstrType::SB; break;
       case s_instr_code::SH: _type = InstrType::SH; break;
       case s_instr_code::SW: _type = InstrType::SW; break;
-      default: throw std::runtime_error("instruction parse error: unrecognizable S-instruction code.");
+      default: break;
+        // throw std::runtime_error("instruction parse error: unrecognizable S-instruction code.");
       }
     } break;
     case opcode_t::I_INSTR: {
-      _fields.imm = slice_bytes<int32_t, 31, 20>(_instr);
-      switch(static_cast<i_instr_code>(_fields.funct3)) {
+      _fields.imm = slice_bytes<int32_t, 31, 20>(instr);
+      switch(static_cast<i_instr_code>(funct3)) {
       case i_instr_code::ADDI:  _type = InstrType::ADDI;  break;
       case i_instr_code::SLTI:  _type = InstrType::SLTI;  break;
       case i_instr_code::SLTIU: _type = InstrType::SLTIU; break;
@@ -184,22 +190,25 @@ public:
       case i_instr_code::ANDI:  _type = InstrType::ANDI;  break;
       case i_instr_code::SLLI:  _type = InstrType::SLLI;  break;
       case i_instr_code::SRLI_SRAI: {
-        switch(static_cast<srli_srai_code>(_fields.funct7)) {
+        switch(static_cast<srli_srai_code>(funct7)) {
         case srli_srai_code::SRLI: _type = InstrType::SRLI; break;
         case srli_srai_code::SRAI: _type = InstrType::SRAI; break;
-        default: throw std::runtime_error("instruction parse error: unrecognizable I (imm)-instruction code.");
+        default: break;
+          // throw std::runtime_error("instruction parse error: unrecognizable I (imm)-instruction code.");
         }
       } break;
-      default: throw std::runtime_error("instruction parse error: unrecognizable I (imm)-instruction code.");
+      default: break;
+        // throw std::runtime_error("instruction parse error: unrecognizable I (imm)-instruction code.");
       }
     } break;
     case opcode_t::R_INSTR: {
-      switch(static_cast<r_instr_code>(_fields.funct3)) {
+      switch(static_cast<r_instr_code>(funct3)) {
       case r_instr_code::ADD_SUB: {
-        switch(static_cast<add_sub_code>(_fields.funct7)) {
+        switch(static_cast<add_sub_code>(funct7)) {
         case add_sub_code::ADD: _type = InstrType::ADD; break;
         case add_sub_code::SUB: _type = InstrType::SUB; break;
-        default: throw std::runtime_error("instruction parse error: unrecognizable R-instruction code.");
+        default: break;
+          // throw std::runtime_error("instruction parse error: unrecognizable R-instruction code.");
         }
       } break;
       case r_instr_code::SLL:  _type = InstrType::SLL;  break;
@@ -207,38 +216,42 @@ public:
       case r_instr_code::SLTU: _type = InstrType::SLTU; break;
       case r_instr_code::XOR:  _type = InstrType::XOR;  break;
       case r_instr_code::SRL_SRA: {
-        switch(static_cast<srl_sra_code>(_fields.funct7)) {
+        switch(static_cast<srl_sra_code>(funct7)) {
         case srl_sra_code::SRL: _type = InstrType::SRL; break;
         case srl_sra_code::srA: _type = InstrType::SRA; break;
-        default: throw std::runtime_error("instruction parse error: unrecognizable R-instruction code.");
+        default: break;
+          // throw std::runtime_error("instruction parse error: unrecognizable R-instruction code.");
         }
       } break;
       case r_instr_code::OR:  _type = InstrType::OR;  break;
       case r_instr_code::AND: _type = InstrType::AND; break;
-      default: throw std::runtime_error("instruction parse error: unrecognizable R-instruction code.");
+      default: break;
+        // throw std::runtime_error("instruction parse error: unrecognizable R-instruction code.");
       }
     } break;
-    default: throw std::runtime_error("instruction parse error: unrecognizable opcode.");
+    default: break;
+      // throw std::runtime_error("instruction parse error: unrecognizable opcode.");
     }
   }
 
-  InstrType type() const { return _type; }
-  uint8_t rs1() const { return _fields.rs1; }
-  uint8_t rs2() const { return _fields.rs2_shamt; }
-  uint8_t rd() const { return _fields.rd; }
-  uint8_t shamt() const { return _fields.rs2_shamt; }
-  int32_t imm() const { return _fields.imm; }
+  [[nodiscard]] bool valid() const { return _type != InstrType::INVALID; }
+  [[nodiscard]] InstrType type() const { return _type; }
+  [[nodiscard]] uint8_t rs1() const { return _fields.rs1; }
+  [[nodiscard]] uint8_t rs2() const { return _fields.rs2_shamt; }
+  [[nodiscard]] uint8_t rd() const { return _fields.rd; }
+  [[nodiscard]] uint8_t shamt() const { return _fields.rs2_shamt; }
+  [[nodiscard]] int32_t imm() const { return _fields.imm; }
 
 private:
-  raw_instr_t _instr;
+  // raw_instr_t _instr;
   InstrType _type;
   struct {
-    uint8_t  funct3;    // instr[14:12]
-    uint8_t  funct7;    // instr[31:25]
+    // uint8_t  funct3;    // instr[14:12]
+    // uint8_t  funct7;    // instr[31:25]
     uint8_t  rs2_shamt; // instr[24:20]
     uint8_t  rs1;       // instr[19:15]
     uint8_t  rd;        // instr[11:7]  register destination
-    uint8_t  opcode;    // instr[6:0]
+    // uint8_t  opcode;    // instr[6:0]
     int32_t  imm;       // immediate value
   } _fields;
 };

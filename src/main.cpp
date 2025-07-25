@@ -1,8 +1,7 @@
 #include "cpu.h"
-#include "utility.h"
-#include "common.h"
-#include "instruction.h"
 
 int main() {
+  insomnia::CPU cpu;
+  cpu.read_program();
   return 0;
 }

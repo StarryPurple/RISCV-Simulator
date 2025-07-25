@@ -40,9 +40,9 @@ public:
     if(f >= Len) f -= Len;
     return _data[f];
   }
-  int size() const { return _size; }
-  bool empty() const { return _size == 0; }
-  bool full() const { return _size == Len; }
+  [[nodiscard]] int size() const { return _size; }
+  [[nodiscard]] bool empty() const { return _size == 0; }
+  [[nodiscard]] bool full() const { return _size == Len; }
 
 private:
   T _data[Len]{};
