@@ -2,6 +2,7 @@
 #define ISM_INSTRUCTION_FETCH_UNIT_H
 
 #include "common.h"
+#include "instruction.h"
 
 namespace insomnia {
 

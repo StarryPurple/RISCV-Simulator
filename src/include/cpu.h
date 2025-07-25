@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <iostream>
 #include <random>
-#include <vector>
 
 #include "alu.h"
 #include "ram.h"
@@ -22,7 +21,7 @@ namespace insomnia {
 
 class CPU {
   // module type alias
-  using RAMP = RAMProxy<RAMSize>;
+  using RAMC = RAMCache<RAMSize>;
   using DEC  = Decoder;
   using IFU  = InstructionFetchUnit<IFUSize>;
   using DU   = DispatchUnit;
@@ -34,13 +33,13 @@ class CPU {
   using RF   = RegisterFile;
 
 private:
-  instr_ptr_t _pc; // program counter register, isolated from RF.
-  clock_t _clk;    // state machine update clock
+  mem_ptr_t _pc; // program counter register, isolated from RF.
+  clock_t _clk;  // state machine update clock
   std::array<std::shared_ptr<CPUModule>, 10> _modules; // CPU modules
 
 public:
   CPU() {
-    std::shared_ptr<RAMP> ramp;      // Random Access Memory (or rather, its proxy)
+    std::shared_ptr<RAMC> ramc;      // Random Access Memory (or rather, its cache)
     std::shared_ptr<DEC>  dec;       // Instruction Decoder
     std::shared_ptr<IFU>  ifu;       // Instruction Fetch Unit
     std::shared_ptr<DU>   du;        // Dispatch Unit (with Instruction Fetch Unit and Decoder integrated)
@@ -50,7 +49,10 @@ public:
     std::shared_ptr<RS>   rs;        // Reservation Station
     std::shared_ptr<PRED> pred;      // Branch Predictor
     std::shared_ptr<RF>   rf;        // General Register File
-    _modules = {ramp, dec, du, rob, calu, lsb, rs, pred, rf};
+
+    // You can even shuffle the modules here.
+    // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device()()));
+    _modules = {ramc, dec, du, rob, calu, lsb, rs, pred, rf};
   }
 
   void tick() {
@@ -72,7 +74,8 @@ public:
 private:
   // via std::cin. Pre-assumed the input style.
   void read_program() {
-    instr_ptr_t cur_ptr = 0, diff_ptr = 0;
+    /*
+    mem_ptr_t cur_ptr = 0, diff_ptr = 0;
     raw_instr_t raw_instr = 0;
     int hex_cnt = 0;
     for(char ch = std::cin.get(); ch != EOF; ch = std::cin.get()) {
@@ -95,6 +98,7 @@ private:
         diff_ptr += 4;
       }
     }
+    */
   }
 
 };

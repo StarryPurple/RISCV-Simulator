@@ -11,6 +11,8 @@
 
 namespace insomnia {
 
+using raw_instr_t = uint32_t; // RV32I 4 bytes
+
 enum class InstrType {
   INVALID,
   LUI, AUIPC,
@@ -27,7 +29,7 @@ enum class opcode_t : uint8_t {
   LUI     = 0b0110111,
   AUIPC   = 0b0010111,
   JAL     = 0b1101111,
-  JALR    = 0b1100111,
+  JALR    = 0b1100111, // actually its type is I
   B_INSTR = 0b1100011,
   L_INSTR = 0b0000011, // type I: load
   S_INSTR = 0b0100011,
@@ -111,20 +113,20 @@ public:
 
   void resolve(raw_instr_t instr) {
     _type = InstrType::INVALID;
-    _fields.rs2_shamt = slice_bytes<uint8_t, 24, 20>(instr);
-    _fields.rs1       = slice_bytes<uint8_t, 19, 15>(instr);
-    _fields.rd        = slice_bytes<uint8_t, 11,  7>(instr);
+    _rs2_shamt = slice_bytes<uint8_t, 24, 20>(instr);
+    _rs1       = slice_bytes<uint8_t, 19, 15>(instr);
+    _rd        = slice_bytes<uint8_t, 11,  7>(instr);
     auto funct3 = slice_bytes<uint8_t, 14, 12>(instr);
     auto funct7 = slice_bytes<uint8_t, 31, 25>(instr);
     auto opcode = slice_bytes<uint8_t,  6,  0>(instr);
     switch(static_cast<opcode_t>(opcode)) {
     case opcode_t::LUI: {
       _type = InstrType::LUI;
-      _fields.imm = slice_bytes<int32_t, 31, 12>(instr);
+      _imm = slice_bytes<int32_t, 31, 12>(instr);
     } break;
     case opcode_t::AUIPC: {
       _type = InstrType::AUIPC;
-      _fields.imm = slice_bytes<int32_t, 31, 12>(instr);
+      _imm = slice_bytes<int32_t, 31, 12>(instr);
     } break;
     case opcode_t::JAL: {
       _type = InstrType::JAL;
@@ -132,18 +134,18 @@ public:
       auto imm10_1  = slice_bytes<int32_t, 30, 21>(instr);
       auto imm11    = slice_bytes<int32_t, 20, 20>(instr);
       auto imm19_12 = slice_bytes<int32_t, 19, 12>(instr);
-      _fields.imm = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
+      _imm = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
     } break;
     case opcode_t::JALR: {
       _type = InstrType::JALR;
-      _fields.imm = slice_bytes<int32_t, 31, 20>(instr);
+      _imm = slice_bytes<int32_t, 31, 20>(instr);
     } break;
     case opcode_t::B_INSTR: {
       auto imm12    = slice_bytes<int32_t, 31, 31>(instr);
       auto imm10_5  = slice_bytes<int32_t, 30, 25>(instr);
       auto imm4_1   = slice_bytes<int32_t, 11,  8>(instr);
       auto imm11    = slice_bytes<int32_t,  7,  7>(instr);
-      _fields.imm = (imm12 << 12) | (imm11 << 11)| (imm10_5 << 5) | (imm4_1 << 1);
+      _imm = (imm12 << 12) | (imm11 << 11)| (imm10_5 << 5) | (imm4_1 << 1);
       switch(static_cast<b_instr_code>(funct3)) {
       case b_instr_code::BEQ:  _type = InstrType::BEQ;  break;
       case b_instr_code::BNE:  _type = InstrType::BNE;  break;
@@ -156,7 +158,7 @@ public:
       }
     }  break;
     case opcode_t::L_INSTR: {
-      _fields.imm = slice_bytes<int32_t, 31, 20>(instr);
+      _imm = slice_bytes<int32_t, 31, 20>(instr);
       switch(static_cast<l_instr_code>(funct3)) {
       case l_instr_code::LB:  _type = InstrType::LB;  break;
       case l_instr_code::LH:  _type = InstrType::LH;  break;
@@ -170,7 +172,7 @@ public:
     case opcode_t::S_INSTR: {
       auto imm11_5 = slice_bytes<int32_t, 31, 25>(instr);
       auto imm4_0  = slice_bytes<int32_t, 11,  7>(instr);
-      _fields.imm = (imm11_5 << 5) | (imm4_0 << 0);
+      _imm = (imm11_5 << 5) | (imm4_0 << 0);
       switch(static_cast<s_instr_code>(funct3)) {
       case s_instr_code::SB: _type = InstrType::SB; break;
       case s_instr_code::SH: _type = InstrType::SH; break;
@@ -180,7 +182,7 @@ public:
       }
     } break;
     case opcode_t::I_INSTR: {
-      _fields.imm = slice_bytes<int32_t, 31, 20>(instr);
+      _imm = slice_bytes<int32_t, 31, 20>(instr);
       switch(static_cast<i_instr_code>(funct3)) {
       case i_instr_code::ADDI:  _type = InstrType::ADDI;  break;
       case i_instr_code::SLTI:  _type = InstrType::SLTI;  break;
@@ -236,24 +238,22 @@ public:
 
   [[nodiscard]] bool valid() const { return _type != InstrType::INVALID; }
   [[nodiscard]] InstrType type() const { return _type; }
-  [[nodiscard]] uint8_t rs1() const { return _fields.rs1; }
-  [[nodiscard]] uint8_t rs2() const { return _fields.rs2_shamt; }
-  [[nodiscard]] uint8_t rd() const { return _fields.rd; }
-  [[nodiscard]] uint8_t shamt() const { return _fields.rs2_shamt; }
-  [[nodiscard]] int32_t imm() const { return _fields.imm; }
+  [[nodiscard]] uint8_t rs1() const { return _rs1; }
+  [[nodiscard]] uint8_t rs2() const { return _rs2_shamt; }
+  [[nodiscard]] uint8_t rd() const { return _rd; }
+  [[nodiscard]] uint8_t shamt() const { return _rs2_shamt; }
+  [[nodiscard]] int32_t imm() const { return _imm; }
 
 private:
   // raw_instr_t _instr;
   InstrType _type;
-  struct {
-    // uint8_t  funct3;    // instr[14:12]
-    // uint8_t  funct7;    // instr[31:25]
-    uint8_t  rs2_shamt; // instr[24:20]
-    uint8_t  rs1;       // instr[19:15]
-    uint8_t  rd;        // instr[11:7]  register destination
-    // uint8_t  opcode;    // instr[6:0]
-    int32_t  imm;       // immediate value
-  } _fields;
+  // uint8_t  _funct3;    // instr[14:12]
+  // uint8_t  _funct7;    // instr[31:25]
+  uint8_t  _rs2_shamt; // instr[24:20]
+  uint8_t  _rs1;       // instr[19:15]
+  uint8_t  _rd;        // instr[11:7]  register destination
+  // uint8_t  _opcode;    // instr[6:0]
+  int32_t  _imm;       // immediate value
 };
 
 }
