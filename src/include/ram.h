@@ -19,7 +19,19 @@ public:
   _output_ifu(std::move(output_ifu)),
   _output_lsb(std::move(output_lsb)) {}
 
-  bool update() override { return false; }
+  bool update() override {
+    if(_input_lsb->is_load_request && _input_lsb->is_store_request) {
+      throw std::runtime_error("RAM update: Invalid wire harness");
+    }
+    if(!_input_lsb->is_load_request && !_input_lsb->is_store_request) {
+      return false;
+    }
+    if(_input_lsb->is_load_request) {
+      /*...*/
+    } else if(_input_lsb->is_store_request) {
+      /*...*/
+    }
+  }
   void sync() override {}
 
 private:
