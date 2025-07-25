@@ -9,12 +9,9 @@ namespace insomnia {
 
 /********************* global parameters ************************/
 
-enum class data_len_t {
-  BYTE = 1, HALF_WORD = 2, WORD = 4,
-};
-
 using mem_val_t   = uint32_t; // RV32I 4 bytes
 using mem_ptr_t   = uint32_t; // RV32I 4 bytes
+using mptr_diff_t = uint8_t;
 using clock_t     = uint32_t;
 
 constexpr std::size_t RAMSize = 1 << 22; // 4KB
