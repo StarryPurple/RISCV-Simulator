@@ -21,66 +21,67 @@ class MIU : public CPUModule {
   };
 public:
   MIU(
-    std::shared_ptr<const WH_LSB_RAMC> input_lsb,
-    std::shared_ptr<const WH_IFU_RAMC> input_ifu,
-    std::shared_ptr<WH_RAMC_IFU> output_ifu,
-    std::shared_ptr<WH_RAMC_LSB> output_lsb
+    std::shared_ptr<const WH_LSB_MIU> lsb_input,
+    std::shared_ptr<const WH_IFU_MIU> ifu_input,
+    std::shared_ptr<WH_MIU_IFU> ifu_output,
+    std::shared_ptr<WH_MIU_LSB> lsb_output
     ) :
-  _input_lsb(std::move(input_lsb)), _input_ifu(std::move(input_ifu)),
-  _output_ifu(std::move(output_ifu)), _output_lsb(std::move(output_lsb)),
+  _lsb_input(std::move(lsb_input)), _ifu_input(std::move(ifu_input)),
+  _ifu_output(std::move(ifu_output)), _lsb_output(std::move(lsb_output)),
   _mem(),
   _cur_stat(State::IDLE), _nxt_stat(State::IDLE),
   _cur_regs(), _nxt_regs() {}
 
+  void sync() override {
+    _cur_stat = _nxt_stat;
+    _cur_regs = _nxt_regs;
+  }
   bool update() override {
     _nxt_stat = _cur_stat;
     _nxt_regs = _cur_regs;
 
-    WH_RAMC_IFU nxt_output_ifu{};
-    WH_RAMC_LSB nxt_output_lsb{};
+    WH_MIU_IFU ifu_output{};
+    WH_MIU_LSB lsb_output{};
 
     switch(_cur_stat) {
     case State::IDLE: {
-      handle_request();
+      try_process();
     } break;
     case State::LSB_LOAD: {
       if(--_nxt_regs.cycle_remain == 0) {
-        nxt_output_lsb.is_valid = true;
-        nxt_output_lsb.value = read_mem(_cur_regs.address, _cur_regs.data_len);
-        handle_request();
+        lsb_output.is_valid = true;
+        lsb_output.value = read_mem(_cur_regs.addr, _cur_regs.data_len);
+        try_process();
       }
     } break;
     case State::LSB_STORE: {
       if(--_nxt_regs.cycle_remain == 0) {
-        write_mem(_cur_regs.address, _cur_regs.data_len, _cur_regs.value);
-        handle_request();
+        write_mem(_cur_regs.addr, _cur_regs.data_len, _cur_regs.value);
+        try_process();
       }
     } break;
     case State::IFU_FETCH: {
       if(--_nxt_regs.cycle_remain == 0) {
-        nxt_output_ifu.is_valid = true;
-        nxt_output_ifu.instr = static_cast<raw_instr_t>(
-          read_mem(_cur_regs.address + InstrOffset, _cur_regs.data_len));
-        handle_request();
+        ifu_output.is_valid = true;
+        ifu_output.instr = static_cast<raw_instr_t>(
+          read_mem(_cur_regs.addr + InstrOffset, _cur_regs.data_len));
+        ifu_output.instr_addr = _cur_regs.addr;
+        try_process();
       }
     } break;
     }
 
     bool update_signal = false;
 
-    if(*_output_ifu != nxt_output_ifu) {
-      *_output_ifu = nxt_output_ifu;
+    if(*_ifu_output != ifu_output) {
+      *_ifu_output = ifu_output;
       update_signal = true;
     }
-    if(*_output_lsb != nxt_output_lsb) {
-      *_output_lsb = nxt_output_lsb;
+    if(*_lsb_output != lsb_output) {
+      *_lsb_output = lsb_output;
       update_signal = true;
     }
     return update_signal;
-  }
-  void sync() override {
-    _cur_stat = _nxt_stat;
-    _cur_regs = _nxt_regs;
   }
 
   // the offset here does not include InstrOffset
@@ -90,35 +91,34 @@ public:
   }
 
 private:
-  const std::shared_ptr<const WH_LSB_RAMC> _input_lsb;
-  const std::shared_ptr<const WH_IFU_RAMC> _input_ifu;
-  const std::shared_ptr<WH_RAMC_IFU> _output_ifu;
-  const std::shared_ptr<WH_RAMC_LSB> _output_lsb;
+  const std::shared_ptr<const WH_LSB_MIU> _lsb_input;
+  const std::shared_ptr<const WH_IFU_MIU> _ifu_input;
+  const std::shared_ptr<WH_MIU_IFU> _ifu_output;
+  const std::shared_ptr<WH_MIU_LSB> _lsb_output;
   std::array<uint8_t, RAMCap> _mem;
   State _cur_stat, _nxt_stat;
   Registers _cur_regs, _nxt_regs;
 
-  void handle_request() {
-    if(_input_lsb->is_load_request && _input_lsb->is_store_request)
+  void try_process() {
+    if(_lsb_input->is_load_request && _lsb_input->is_store_request)
       throw std::runtime_error("RAM update: Invalid wire harness");
-    if(_input_lsb->is_load_request) {
-      _nxt_regs.addr = _input_lsb->addr;
-      _nxt_regs.data_len = _input_lsb->data_len;
+    _nxt_stat = State::IDLE;
+    if(_lsb_input->is_load_request) {
+      _nxt_regs.addr = _lsb_input->addr;
+      _nxt_regs.data_len = _lsb_input->data_len;
       _nxt_regs.cycle_remain = 3;
       _nxt_stat = State::LSB_LOAD;
-    } else if(_input_lsb->is_store_request) {
-      _nxt_regs.addr = _input_lsb->addr;
-      _nxt_regs.data_len = _input_lsb->data_len;
-      _nxt_regs.value = _input_lsb->value;
+    } else if(_lsb_input->is_store_request) {
+      _nxt_regs.addr = _lsb_input->addr;
+      _nxt_regs.data_len = _lsb_input->data_len;
+      _nxt_regs.value = _lsb_input->value;
       _nxt_regs.cycle_remain = 3;
       _nxt_stat = State::LSB_STORE;
-    } else if(_input_ifu->is_valid) {
-      _nxt_regs.addr = _input_ifu->pc;
+    } else if(_ifu_input->is_valid) {
+      _nxt_regs.addr = _ifu_input->pc;
       _nxt_regs.data_len = 4; // fixed
       _nxt_regs.cycle_remain = 3;
       _nxt_stat = State::IFU_FETCH;
-    } else {
-      _nxt_stat = State::IDLE;
     }
   }
   mem_val_t read_mem(mem_ptr_t addr, mptr_diff_t data_len) {

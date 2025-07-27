@@ -21,7 +21,7 @@ namespace insomnia {
 
 class CPU {
   // module type alias
-  using MIU = MIU<RAMSize, RAMInstrOffset>;
+  using MIU  = MIU<RAMSize, RAMInstrOffset>;
   using DEC  = Decoder;
   using IFU  = InstructionFetchUnit<IFUSize>;
   using DU   = DispatchUnit;

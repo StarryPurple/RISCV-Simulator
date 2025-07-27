@@ -4,7 +4,7 @@
 #include <stdexcept>
 namespace insomnia {
 
-template <class T, int Len>
+template <class T, std::size_t Len>
 class circular_queue {
   static_assert(std::is_default_constructible_v<T> && Len > 0);
 public:
@@ -13,7 +13,17 @@ public:
   void push(const T &t) {
     if(full()) throw std::runtime_error("push in full circular queue.");
     _size++;
-    back() = t;
+    std::size_t f = _rear + _size - 1;
+    if(f >= Len) f -= Len;
+    _data[f] = t;
+  }
+  template <class ...Args>
+  void emplace(Args &&...args) {
+    if(full()) throw std::runtime_error("emplace in full circular queue.");
+    _size++;
+    std::size_t f = _rear + _size - 1;
+    if(f >= Len) f -= Len;
+    new (&_data[f]) T(std::forward<Args>(args)...);
   }
   void pop() {
     if(empty()) throw std::runtime_error("pop in empty circular queue.");
@@ -30,23 +40,23 @@ public:
   }
   T& back() {
     if(empty()) throw std::runtime_error("read in empty circular queue.");
-    int f = _rear + _size - 1;
+    std::size_t f = _rear + _size - 1;
     if(f >= Len) f -= Len;
     return _data[f];
   }
   const T& back() const {
     if(empty()) throw std::runtime_error("read in empty circular queue.");
-    int f = _rear + _size - 1;
+    std::size_t f = _rear + _size - 1;
     if(f >= Len) f -= Len;
     return _data[f];
   }
-  [[nodiscard]] int size() const { return _size; }
+  [[nodiscard]] std::size_t size() const { return _size; }
   [[nodiscard]] bool empty() const { return _size == 0; }
   [[nodiscard]] bool full() const { return _size == Len; }
 
 private:
   T _data[Len]{};
-  int _rear = 0, _size = 0;
+  std::size_t _rear = 0, _size = 0;
 };
 
 }
