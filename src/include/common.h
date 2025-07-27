@@ -20,6 +20,8 @@ constexpr std::size_t RoBSize = 16;
 constexpr std::size_t LSBSize = 16;
 constexpr std::size_t RSSize  = 16;
 
+constexpr std::size_t RAMInstrOffset = 1 << 21; // 2KB
+
 /********************* module base ********************************/
 
 // CPU circuit module base.

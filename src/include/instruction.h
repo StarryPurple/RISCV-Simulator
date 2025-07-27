@@ -109,42 +109,42 @@ enum class srl_sra_code : uint8_t {
 class Instruction {
 public:
   Instruction() = default;
-  explicit Instruction(raw_instr_t instr) { resolve(instr); }
+  explicit Instruction(raw_instr_t raw_instr) { resolve(raw_instr); }
 
-  void resolve(raw_instr_t instr) {
+  void resolve(raw_instr_t raw_instr) {
     _type = InstrType::INVALID;
-    _rs2_shamt = slice_bytes<uint8_t, 24, 20>(instr);
-    _rs1       = slice_bytes<uint8_t, 19, 15>(instr);
-    _rd        = slice_bytes<uint8_t, 11,  7>(instr);
-    auto funct3 = slice_bytes<uint8_t, 14, 12>(instr);
-    auto funct7 = slice_bytes<uint8_t, 31, 25>(instr);
-    auto opcode = slice_bytes<uint8_t,  6,  0>(instr);
+    _rs2_shamt = slice_bytes<uint8_t, 24, 20>(raw_instr);
+    _rs1       = slice_bytes<uint8_t, 19, 15>(raw_instr);
+    _rd        = slice_bytes<uint8_t, 11,  7>(raw_instr);
+    auto funct3 = slice_bytes<uint8_t, 14, 12>(raw_instr);
+    auto funct7 = slice_bytes<uint8_t, 31, 25>(raw_instr);
+    auto opcode = slice_bytes<uint8_t,  6,  0>(raw_instr);
     switch(static_cast<opcode_t>(opcode)) {
     case opcode_t::LUI: {
       _type = InstrType::LUI;
-      _imm = slice_bytes<int32_t, 31, 12>(instr);
+      _imm = slice_bytes<int32_t, 31, 12>(raw_instr);
     } break;
     case opcode_t::AUIPC: {
       _type = InstrType::AUIPC;
-      _imm = slice_bytes<int32_t, 31, 12>(instr);
+      _imm = slice_bytes<int32_t, 31, 12>(raw_instr);
     } break;
     case opcode_t::JAL: {
       _type = InstrType::JAL;
-      auto imm20    = slice_bytes<int32_t, 31, 31>(instr);
-      auto imm10_1  = slice_bytes<int32_t, 30, 21>(instr);
-      auto imm11    = slice_bytes<int32_t, 20, 20>(instr);
-      auto imm19_12 = slice_bytes<int32_t, 19, 12>(instr);
+      auto imm20    = slice_bytes<int32_t, 31, 31>(raw_instr);
+      auto imm10_1  = slice_bytes<int32_t, 30, 21>(raw_instr);
+      auto imm11    = slice_bytes<int32_t, 20, 20>(raw_instr);
+      auto imm19_12 = slice_bytes<int32_t, 19, 12>(raw_instr);
       _imm = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
     } break;
     case opcode_t::JALR: {
       _type = InstrType::JALR;
-      _imm = slice_bytes<int32_t, 31, 20>(instr);
+      _imm = slice_bytes<int32_t, 31, 20>(raw_instr);
     } break;
     case opcode_t::B_INSTR: {
-      auto imm12    = slice_bytes<int32_t, 31, 31>(instr);
-      auto imm10_5  = slice_bytes<int32_t, 30, 25>(instr);
-      auto imm4_1   = slice_bytes<int32_t, 11,  8>(instr);
-      auto imm11    = slice_bytes<int32_t,  7,  7>(instr);
+      auto imm12    = slice_bytes<int32_t, 31, 31>(raw_instr);
+      auto imm10_5  = slice_bytes<int32_t, 30, 25>(raw_instr);
+      auto imm4_1   = slice_bytes<int32_t, 11,  8>(raw_instr);
+      auto imm11    = slice_bytes<int32_t,  7,  7>(raw_instr);
       _imm = (imm12 << 12) | (imm11 << 11)| (imm10_5 << 5) | (imm4_1 << 1);
       switch(static_cast<b_instr_code>(funct3)) {
       case b_instr_code::BEQ:  _type = InstrType::BEQ;  break;
@@ -158,7 +158,7 @@ public:
       }
     }  break;
     case opcode_t::L_INSTR: {
-      _imm = slice_bytes<int32_t, 31, 20>(instr);
+      _imm = slice_bytes<int32_t, 31, 20>(raw_instr);
       switch(static_cast<l_instr_code>(funct3)) {
       case l_instr_code::LB:  _type = InstrType::LB;  break;
       case l_instr_code::LH:  _type = InstrType::LH;  break;
@@ -170,8 +170,8 @@ public:
       }
     } break;
     case opcode_t::S_INSTR: {
-      auto imm11_5 = slice_bytes<int32_t, 31, 25>(instr);
-      auto imm4_0  = slice_bytes<int32_t, 11,  7>(instr);
+      auto imm11_5 = slice_bytes<int32_t, 31, 25>(raw_instr);
+      auto imm4_0  = slice_bytes<int32_t, 11,  7>(raw_instr);
       _imm = (imm11_5 << 5) | (imm4_0 << 0);
       switch(static_cast<s_instr_code>(funct3)) {
       case s_instr_code::SB: _type = InstrType::SB; break;
@@ -182,7 +182,7 @@ public:
       }
     } break;
     case opcode_t::I_INSTR: {
-      _imm = slice_bytes<int32_t, 31, 20>(instr);
+      _imm = slice_bytes<int32_t, 31, 20>(raw_instr);
       switch(static_cast<i_instr_code>(funct3)) {
       case i_instr_code::ADDI:  _type = InstrType::ADDI;  break;
       case i_instr_code::SLTI:  _type = InstrType::SLTI;  break;
@@ -243,6 +243,8 @@ public:
   [[nodiscard]] uint8_t rd() const { return _rd; }
   [[nodiscard]] uint8_t shamt() const { return _rs2_shamt; }
   [[nodiscard]] int32_t imm() const { return _imm; }
+
+  auto operator<=>(const Instruction &) const = default; // should be alright
 
 private:
   // raw_instr_t _instr;

@@ -6,7 +6,7 @@
 #include <random>
 
 #include "alu.h"
-#include "ram.h"
+#include "miu.h"
 #include "decoder.h"
 #include "predictor.h"
 #include "wire_harness.h"
@@ -21,7 +21,7 @@ namespace insomnia {
 
 class CPU {
   // module type alias
-  using RAMC = RAMCache<RAMSize>;
+  using MIU = MIU<RAMSize, RAMInstrOffset>;
   using DEC  = Decoder;
   using IFU  = InstructionFetchUnit<IFUSize>;
   using DU   = DispatchUnit;
@@ -35,46 +35,28 @@ class CPU {
 private:
   mem_ptr_t _pc; // program counter register, isolated from RF.
   clock_t _clk;  // state machine update clock
-  std::array<std::shared_ptr<CPUModule>, 10> _modules; // CPU modules
+  std::array<std::shared_ptr<CPUModule>, 10> _modules; // CPU modules array, for traversion
+
+  std::shared_ptr<MIU>  _miu;       // Memory Interface Unit (in contact with RAM)
+  std::shared_ptr<DEC>  _dec;       // Instruction Decoder
+  std::shared_ptr<IFU>  _ifu;       // Instruction Fetch Unit
+  std::shared_ptr<DU>   _du;        // Dispatch Unit (with Instruction Fetch Unit and Decoder integrated)
+  std::shared_ptr<RoB>  _rob;       // Reorder Buffer
+  std::shared_ptr<CALU> _calu;      // (High functional) Common ALU. Can do all kinds of calculation in 1 clock cycle.
+  std::shared_ptr<LSB>  _lsb;       // Load Store Buffer
+  std::shared_ptr<RS>   _rs;        // Reservation Station
+  std::shared_ptr<PRED> _pred;      // Branch Predictor
+  std::shared_ptr<RF>   _rf;        // General Register File
 
 public:
-  CPU() {
-    std::shared_ptr<RAMC> ramc;      // Random Access Memory (or rather, its cache)
-    std::shared_ptr<DEC>  dec;       // Instruction Decoder
-    std::shared_ptr<IFU>  ifu;       // Instruction Fetch Unit
-    std::shared_ptr<DU>   du;        // Dispatch Unit (with Instruction Fetch Unit and Decoder integrated)
-    std::shared_ptr<RoB>  rob;       // Reorder Buffer
-    std::shared_ptr<CALU> calu;      // (High functional) Common ALU. Can do all kinds of calculation in 1 clock cycle.
-    std::shared_ptr<LSB>  lsb;       // Load Store Buffer
-    std::shared_ptr<RS>   rs;        // Reservation Station
-    std::shared_ptr<PRED> pred;      // Branch Predictor
-    std::shared_ptr<RF>   rf;        // General Register File
+  CPU() : _modules{_miu, _dec, _du, _rob, _calu, _lsb, _rs, _pred, _rf} {
 
     // You can even shuffle the modules here.
     // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device()()));
-    _modules = {ramc, dec, du, rob, calu, lsb, rs, pred, rf};
   }
 
-  void tick() {
-    ++_clk;
-    bool stabilized = false;
-    while(!stabilized) {
-      stabilized = true;
-      // You can even shuffle the modules here.
-      // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device()()));
-      for(auto &module: _modules)
-        stabilized &= !module->update();
-    }
-    // You can even shuffle the modules here.
-    // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device()()));
-    for(auto &module: _modules)
-      module->sync();
-  }
-
-private:
   // via std::cin. Pre-assumed the input style.
-  void read_program() {
-    /*
+  void preload_program() {
     mem_ptr_t cur_ptr = 0, diff_ptr = 0;
     raw_instr_t raw_instr = 0;
     int hex_cnt = 0;
@@ -92,13 +74,27 @@ private:
       raw_instr = (raw_instr << 4) | hex2dec(ch);
       if(++hex_cnt == 8) {
         raw_instr = ToSmallEndian32_8(raw_instr);
-        _program.emplace(cur_ptr + diff_ptr, raw_instr);
+        _miu->preload_instruction(raw_instr, cur_ptr + diff_ptr);
         hex_cnt = 0;
         raw_instr = 0;
         diff_ptr += 4;
       }
     }
-    */
+  }
+  void tick() {
+    ++_clk;
+    bool stabilized = false;
+    while(!stabilized) {
+      stabilized = true;
+      // You can even shuffle the modules here.
+      // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device()()));
+      for(auto &module: _modules)
+        stabilized &= !module->update();
+    }
+    // You can even shuffle the modules here.
+    // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device()()));
+    for(auto &module: _modules)
+      module->sync();
   }
 
 };

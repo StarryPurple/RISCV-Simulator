@@ -2,6 +2,6 @@
 
 int main() {
   insomnia::CPU cpu;
-  cpu.read_program();
+  cpu.preload_program();
   return 0;
 }

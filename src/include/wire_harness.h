@@ -4,37 +4,87 @@
 #include "common.h"
 #include "instruction.h"
 
+// Module implementation order:
+// RAM Cache
+// Decoder
+// Instruction Fetch Unit
+
+// output structs be in front of input structs
+
 namespace insomnia {
 
 // load raw instruction
 struct WH_RAMC_IFU {
-  bool is_valid;
-  raw_instr_t instr;
+  bool is_valid = false;
+  raw_instr_t instr{};
   auto operator<=>(const WH_RAMC_IFU &) const = default;
 };
 
 // instruction load request
 struct WH_IFU_RAMC {
-  bool is_valid;
-  mem_ptr_t pc;
+  bool is_valid = false;
+  mem_ptr_t pc{};
   auto operator<=>(const WH_IFU_RAMC &) const = default;
 };
 
 // load data
 struct WH_RAMC_LSB {
-  bool is_valid;
-  mem_val_t value;
+  bool is_valid = false;
+  mem_val_t value{};
   auto operator<=>(const WH_RAMC_LSB &) const = default;
 };
 
 // data load request / store data
 struct WH_LSB_RAMC {
-  bool is_load_request;
-  bool is_store_request;
-  mem_ptr_t address;
-  mem_val_t value;
-  mptr_diff_t data_len;
+  bool is_load_request = false;
+  bool is_store_request = false;
+  mem_ptr_t addr{};
+  mem_val_t value{};
+  mptr_diff_t data_len{};
   auto operator<=>(const WH_LSB_RAMC &) const = default;
+};
+
+// decoded instruction
+struct WH_DEC_DU {
+  bool is_valid = false;
+  Instruction instr{};
+  auto operator<=>(const WH_DEC_DU &) const = default;
+};
+
+// raw instruction
+struct WH_DU_DEC {
+  bool is_valid = false;
+  raw_instr_t raw_instr{};
+  auto operator<=>(const WH_DU_DEC &) const = default;
+};
+
+struct WH_IFU_DU {
+  bool is_valid = false;
+
+  auto operator<=>(const WH_IFU_DU &) const = default;
+};
+
+struct WH_IFU_PRED {
+  bool is_valid = false;
+  mem_ptr_t raw_instr_addr; // for predictor to locate the instruction and predict
+
+  auto operator<=>(const WH_IFU_PRED &) const = default;
+};
+
+struct WH_DU_IFU {
+  bool is_valid = false;
+
+  auto operator<=>(const WH_DU_IFU &) const = default;
+};
+
+struct WH_PRED_IFU {
+  bool sig_send_pred = false;
+  mem_ptr_t pred_pc;
+
+  bool sig_pred_fail = false; // flush
+  mem_ptr_t pred_fail_pc; // the true pc pointer transferred at flush
+
+  auto operator<=>(const WH_PRED_IFU &) const = default;
 };
 
 }
