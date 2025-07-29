@@ -244,14 +244,19 @@ public:
   [[nodiscard]] uint8_t shamt() const { return _rs2_shamt; }
   [[nodiscard]] int32_t imm() const { return _imm; }
 
-  [[nodiscard]] bool is_branch() const {
+  [[nodiscard]] bool is_br() const {
     return _type == InstrType::BEQ || _type == InstrType::BNE || _type == InstrType::BGE ||
       _type == InstrType::BLT || _type == InstrType::BGEU || _type == InstrType::BLTU;
   }
 
-  [[nodiscard]] bool is_jump() const {
-    return _type == InstrType::JAL || _type == InstrType::JALR;
+  [[nodiscard]] bool is_jal() const {
+    return _type == InstrType::JAL;
   }
+
+  [[nodiscard]] bool is_jalr() const {
+    return _type == InstrType::JALR;
+  }
+
 
   auto operator<=>(const Instruction &) const = default; // should be alright
 

@@ -12,7 +12,8 @@ class ReorderBuffer : public CPUModule {
   struct Entry {
     bool is_ready; // whether the result is valid
 
-    bool is_br_jalr; // in case the predictor needs it
+    bool is_br; // in case the predictor needs it
+    bool is_jalr;
     mem_ptr_t instr_addr;
     mem_ptr_t pred_pc; // the pc provided by predictor
     mem_ptr_t real_pc; // the pc calculated
@@ -71,7 +72,8 @@ public:
       du_output.is_valid = true;
       _nxt_regs.queue.push(Entry{
         .is_ready = false,
-        .is_br_jalr = _du_input->is_br_jalr,
+        .is_br = _du_input->is_br,
+        .is_jalr = _du_input->is_jalr,
         .instr_addr = _du_input->instr_addr,
         .pred_pc = _du_input->pred_pc,
         .is_store = _du_input->is_store,
@@ -87,7 +89,7 @@ public:
       if(entry.is_valid) {
         auto &record = _nxt_regs.queue.at(entry.rob_index);
         record.is_ready = true;
-        if(record.is_br_jalr) {
+        if(record.is_br || record.is_jalr) {
           record.real_pc = entry.real_pc;
         }
         if(record.is_store) {
@@ -100,12 +102,13 @@ public:
     }
     if(!_nxt_regs.queue.empty() && _nxt_regs.queue.front().is_ready) {
       auto record = _nxt_regs.queue.front();
-      if(record.is_br_jalr) {
+      if(record.is_br || record.is_jalr) {
         // A branch/jalr instruction.
         // PRED interaction
         pred_output.is_valid = true;
         pred_output.instr_addr = record.instr_addr;
         pred_output.real_pc = record.real_pc;
+        pred_output.is_br = record.is_br;
         pred_output.is_pred_taken = (record.pred_pc == record.real_pc);
         if(record.pred_pc != record.real_pc) {
           // Prediction failed. Broadcast flushing signal and clear everything.

@@ -25,7 +25,7 @@ class CPU {
   using DEC  = Decoder;
   using IFU  = InstructionFetchUnit<IFUSize>;
   using DU   = DispatchUnit;
-  using ROB  = ReorderBuffer<RoBSize>;
+  using ROB  = ReorderBuffer<ROBSize>;
   using CALU = CommonALU;
   using LSB  = LoadStoreBuffer<LSBSize>;
   using RS   = ReservationStation<RSSize>;
@@ -52,7 +52,7 @@ public:
   CPU() : _modules{_miu, _dec, _du, _rob, _calu, _lsb, _rs, _pred, _rf} {
 
     // You can even shuffle the modules here.
-    // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device()()));
+    // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
   }
 
   // via std::cin. Pre-assumed the input style.
@@ -83,16 +83,15 @@ public:
   }
   void tick() {
     ++_clk;
-    bool stabilized = false;
-    while(!stabilized) {
+    for(bool stabilized = false; !stabilized; ) {
       stabilized = true;
       // You can even shuffle the modules here.
-      // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device()()));
+      // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
       for(auto &module: _modules)
         stabilized &= !module->update();
     }
     // You can even shuffle the modules here.
-    // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device()()));
+    // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
     for(auto &module: _modules)
       module->sync();
   }

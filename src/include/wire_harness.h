@@ -9,6 +9,7 @@
 // Decoder
 // Instruction Fetch Unit
 // Reorder Buffer
+// Predictor
 
 // output structs be in front of input structs
 
@@ -69,6 +70,8 @@ struct WH_IFU_DU {
 struct WH_IFU_PRED {
   bool is_valid = false;
   mem_ptr_t instr_addr; // for predictor to locate the instruction and predict
+  bool is_br = false;
+  bool is_jalr = false;
 
   auto operator<=>(const WH_IFU_PRED &) const = default;
 };
@@ -91,6 +94,7 @@ struct WH_ROB_PRED {
   mem_ptr_t instr_addr;
   bool is_pred_taken;  // false if prediction failed. For predictor learning.
   mem_ptr_t real_pc; // for prediction learning
+  bool is_br;
 
   auto operator<=>(const WH_ROB_PRED &) const = default;
 };
@@ -120,7 +124,8 @@ struct WH_ROB_LSB {
 struct WH_DU_ROB {
   bool is_valid = false;
 
-  bool is_br_jalr = false;
+  bool is_br = false;
+  bool is_jalr = false;
   mem_ptr_t instr_addr;
   mem_ptr_t pred_pc;
 

@@ -32,6 +32,7 @@ public:
     std::shared_ptr<WH_IFU_DU> du_output
     ) :
   _miu_input(std::move(miu_input)), _pred_input(std::move(pred_input)),
+  _flush_input(std::move(flush_input)),
   _miu_output(std::move(miu_output)), _pred_output(std::move(pred_output)),
   _du_output(std::move(du_output)),
   _cur_stat(State::IDLE), _nxt_stat(State::IDLE),
@@ -124,9 +125,18 @@ private:
     if(!_nxt_regs.queue.empty()) {
       auto [raw_instr, instr_addr] = _nxt_regs.queue.front();
       auto instr = Instruction{raw_instr}; // stimulation of pre decoding
-      if(instr.is_branch() || instr.is_jump()) {
+      if(instr.is_jal()) {
+        _nxt_regs.pc = instr_addr + instr.imm();
+        du_output.is_valid = true;
+        du_output.raw_instr = raw_instr;
+        du_output.instr_addr = instr_addr;
+        _nxt_regs.queue.pop();
+        _nxt_stat = State::IDLE;
+      } else if(instr.is_br()|| instr.is_jalr()) {
         pred_output.is_valid = true;
         pred_output.instr_addr = instr_addr;
+        pred_output.is_br = instr.is_br();
+        pred_output.is_jalr = instr.is_jalr();
         _nxt_stat = State::HANDLE_BR_JMP;
       } else {
         du_output.is_valid = true;
