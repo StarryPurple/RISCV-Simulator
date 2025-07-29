@@ -13,12 +13,15 @@ using mem_val_t   = uint32_t; // RV32I 4 bytes
 using mem_ptr_t   = uint32_t; // RV32I 4 bytes
 using mptr_diff_t = uint8_t;
 using clock_t     = uint32_t;
+using rob_index_t = uint32_t;
+using rf_index_t  = uint8_t;  // 0~31
 
 constexpr std::size_t RAMSize = 1 << 22; // 4KB
 constexpr std::size_t IFUSize = 8;
-constexpr std::size_t RoBSize = 16;
+constexpr std::size_t ROBSize = 16;
 constexpr std::size_t LSBSize = 16;
 constexpr std::size_t RSSize  = 16;
+constexpr std::size_t CDBCap  = 16;
 
 constexpr std::size_t RAMInstrOffset = 1 << 21; // 2KB
 

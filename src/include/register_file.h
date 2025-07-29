@@ -4,9 +4,17 @@
 namespace insomnia {
 
 class RegisterFile : public CPUModule {
+  enum class State {
+
+  };
+  struct Registers {
+
+  };
 public:
   bool update() override { return false; }
   void sync() override {}
+
+private:
 };
 
 }

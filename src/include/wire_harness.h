@@ -8,11 +8,11 @@
 // Memory Interface Unit
 // Decoder
 // Instruction Fetch Unit
+// Reorder Buffer
 
 // output structs be in front of input structs
 
 namespace insomnia {
-
 // load raw instruction
 struct WH_MIU_IFU {
   bool is_valid = false;
@@ -80,13 +80,89 @@ struct WH_DU_IFU {
 };
 
 struct WH_PRED_IFU {
-  bool sig_send_pred = false;
+  bool is_valid = false;
   mem_ptr_t pred_pc;
 
-  bool sig_pred_fail = false; // flush
-  mem_ptr_t pred_fail_pc; // the true pc pointer transferred at flush
-
   auto operator<=>(const WH_PRED_IFU &) const = default;
+};
+
+struct WH_ROB_PRED {
+  bool is_valid = false;
+  mem_ptr_t instr_addr;
+  bool is_pred_taken;  // false if prediction failed. For predictor learning.
+  mem_ptr_t real_pc; // for prediction learning
+
+  auto operator<=>(const WH_ROB_PRED &) const = default;
+};
+
+struct WH_ROB_DU {
+  bool is_valid = false;
+  rob_index_t rob_index;
+
+  auto operator<=>(const WH_ROB_DU &) const = default;
+};
+
+struct WH_ROB_RF {
+  bool is_valid = false;
+  rf_index_t dst_reg;
+  mem_val_t value;
+
+  auto operator<=>(const WH_ROB_RF &) const = default;
+};
+
+struct WH_ROB_LSB {
+  bool is_valid = false;
+  rob_index_t rob_index;
+
+  auto operator<=>(const WH_ROB_LSB &) const = default;
+};
+
+struct WH_DU_ROB {
+  bool is_valid = false;
+
+  bool is_br_jalr = false;
+  mem_ptr_t instr_addr;
+  mem_ptr_t pred_pc;
+
+  bool is_store = false;
+  mem_ptr_t store_addr;
+  mem_val_t store_value;
+  mptr_diff_t data_len;
+
+  bool write_rf;
+  uint8_t dst_reg;
+
+  auto operator<=>(const WH_DU_ROB &) const = default;
+};
+
+// broadcaster: ALU, LSB
+// listener: ROB, RS
+struct WH_DATA_CDB {
+  struct Entry {
+    bool is_valid = false;
+    rob_index_t rob_index;
+
+    // br_jalr pc.
+    mem_ptr_t real_pc;
+
+    // bool write_rf;
+    // store value/rf value.
+    mem_val_t value;
+
+    auto operator<=>(const Entry &) const = default;
+  };
+  std::array<Entry, CDBCap> entries;
+
+  auto operator<=>(const WH_DATA_CDB &) const = default;
+};
+
+// broadcaster: ROB
+// listener: IFU, DU, LSB, RS
+struct WH_FLUSH_CDB {
+  bool is_flush = false;
+  mem_ptr_t pc; // ifu will need it.
+
+  auto operator<=>(const WH_FLUSH_CDB &) const = default;
 };
 
 }

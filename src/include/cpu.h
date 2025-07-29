@@ -25,7 +25,7 @@ class CPU {
   using DEC  = Decoder;
   using IFU  = InstructionFetchUnit<IFUSize>;
   using DU   = DispatchUnit;
-  using RoB  = ReorderBuffer<RoBSize>;
+  using ROB  = ReorderBuffer<RoBSize>;
   using CALU = CommonALU;
   using LSB  = LoadStoreBuffer<LSBSize>;
   using RS   = ReservationStation<RSSize>;
@@ -41,7 +41,7 @@ private:
   std::shared_ptr<DEC>  _dec;       // Instruction Decoder
   std::shared_ptr<IFU>  _ifu;       // Instruction Fetch Unit
   std::shared_ptr<DU>   _du;        // Dispatch Unit (with Instruction Fetch Unit and Decoder integrated)
-  std::shared_ptr<RoB>  _rob;       // Reorder Buffer
+  std::shared_ptr<ROB>  _rob;       // ReOrder Buffer
   std::shared_ptr<CALU> _calu;      // (High functional) Common ALU. Can do all kinds of calculation in 1 clock cycle.
   std::shared_ptr<LSB>  _lsb;       // Load Store Buffer
   std::shared_ptr<RS>   _rs;        // Reservation Station

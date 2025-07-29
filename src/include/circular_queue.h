@@ -53,6 +53,47 @@ public:
   [[nodiscard]] std::size_t size() const { return _size; }
   [[nodiscard]] bool empty() const { return _size == 0; }
   [[nodiscard]] bool full() const { return _size == Len; }
+  [[nodiscard]] std::size_t front_index() const {
+    if(empty()) throw std::runtime_error("read in empty circular queue.");
+    return _rear;
+  }
+  [[nodiscard]] std::size_t back_index() const {
+    if(empty()) throw std::runtime_error("read in empty circular queue.");
+    std::size_t f = _rear + _size - 1;
+    return f >= Len ? f - Len : f;
+  }
+  // what index will it be if a new entry is pushed.
+  [[nodiscard]] std::size_t next_index() const {
+    if(full()) throw std::runtime_error("query next index in full circular queue.");
+    std::size_t res = _rear + _size;
+    return res > Len ? res - Len : res;
+  }
+
+  // You'd better know what you're doing.
+  const T& at(std::size_t index) const {
+    std::size_t f = _rear + _size - 1;
+    if(f > Len) {
+      if(f - Len < index && index < _rear)
+        throw std::runtime_error("read in invalid place.");
+    } else {
+      if(index < _rear || index > f)
+        throw std::runtime_error("read in invalid place.");
+    }
+    return _data[index];
+  }
+
+  // You'd better know what you're doing.
+  T& at(std::size_t index) {
+    std::size_t f = _rear + _size - 1;
+    if(f > Len) {
+      if(f - Len < index && index < _rear)
+        throw std::runtime_error("read in invalid place.");
+    } else {
+      if(index < _rear || index > f)
+        throw std::runtime_error("read in invalid place.");
+    }
+    return _data[index];
+  }
 
 private:
   T _data[Len]{};
