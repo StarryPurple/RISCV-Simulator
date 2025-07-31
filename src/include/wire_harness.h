@@ -9,7 +9,10 @@
 // Decoder
 // Instruction Fetch Unit
 // Reorder Buffer
+// Common Data Bus
 // Predictor
+// Register File
+// Load Store Buffer
 
 // output structs be in front of input structs
 
@@ -46,20 +49,6 @@ struct WH_LSB_MIU {
   auto operator<=>(const WH_LSB_MIU &) const = default;
 };
 
-// decoded instruction
-struct WH_DEC_DU {
-  bool is_valid = false;
-  Instruction instr{};
-  auto operator<=>(const WH_DEC_DU &) const = default;
-};
-
-// raw instruction
-struct WH_DU_DEC {
-  bool is_valid = false;
-  raw_instr_t raw_instr{};
-  auto operator<=>(const WH_DU_DEC &) const = default;
-};
-
 struct WH_IFU_DU {
   bool is_valid = false;
   raw_instr_t raw_instr;
@@ -77,7 +66,7 @@ struct WH_IFU_PRED {
 };
 
 struct WH_DU_IFU {
-  bool is_valid = false;
+  bool can_accept_req = false;
 
   auto operator<=>(const WH_DU_IFU &) const = default;
 };
@@ -110,6 +99,7 @@ struct WH_ROB_RF {
   bool is_valid = false;
   rf_index_t dst_reg;
   mem_val_t value;
+  raw_instr_t raw_instr;
 
   auto operator<=>(const WH_ROB_RF &) const = default;
 };
@@ -137,28 +127,44 @@ struct WH_DU_ROB {
   bool write_rf;
   uint8_t dst_reg;
 
+  raw_instr_t raw_instr;
+
   auto operator<=>(const WH_DU_ROB &) const = default;
 };
 
+
+struct CDBEntry {
+  bool is_valid = false;
+  rob_index_t rob_index;
+
+  // br_jalr pc.
+  mem_ptr_t real_pc;
+
+  // bool write_rf;
+  // store value/rf value.
+  mem_val_t value;
+
+  auto operator<=>(const CDBEntry &) const = default;
+};
+
 // broadcaster: ALU, LSB
-// listener: ROB, RS
-struct WH_DATA_CDB {
-  struct Entry {
-    bool is_valid = false;
-    rob_index_t rob_index;
+// listener: ROB, RS, DU
+struct WH_CDB_OUT {
+  CDBEntry entry;
 
-    // br_jalr pc.
-    mem_ptr_t real_pc;
+  auto operator<=>(const WH_CDB_OUT &) const = default;
+};
 
-    // bool write_rf;
-    // store value/rf value.
-    mem_val_t value;
+struct WH_LSB_CDB {
+  CDBEntry entry;
 
-    auto operator<=>(const Entry &) const = default;
-  };
-  std::array<Entry, CDBCap> entries;
+  auto operator<=>(const WH_LSB_CDB &) const = default;
+};
 
-  auto operator<=>(const WH_DATA_CDB &) const = default;
+struct WH_ALU_CDB {
+  CDBEntry entry;
+
+  auto operator<=>(const WH_ALU_CDB &) const = default;
 };
 
 // broadcaster: ROB
@@ -169,6 +175,97 @@ struct WH_FLUSH_CDB {
 
   auto operator<=>(const WH_FLUSH_CDB &) const = default;
 };
+
+struct WH_RF_DU {
+  bool is_valid = false;
+
+  mem_val_t Vi, Vj;
+
+  auto operator<=>(const WH_RF_DU &) const = default;
+};
+
+struct WH_DU_RF {
+  bool is_valid = false;
+
+  bool reqRi = false, reqRj = false;
+  rf_index_t Ri, Rj;
+
+  auto operator<=>(const WH_DU_RF &) const = default;
+};
+
+struct WH_DU_LSB {
+  bool is_valid = false;
+
+  mem_ptr_t addr;
+  mptr_diff_t data_len;
+  bool is_load = false;
+  bool is_store = false;
+  bool is_store_data_ready;
+  rob_index_t rob_index; // store data no ready
+  mem_val_t value; // store data ready
+
+  auto operator<=>(const WH_DU_LSB &) const = default;
+};
+
+struct WH_DU_RS {
+  bool is_valid = false;
+  rob_index_t rob_index = 0;
+  InstrType instr_type = InstrType::INVALID;
+
+  bool src1_ready = false;
+  mem_val_t src1_value = 0;
+  rob_index_t src1_index = 0;
+
+  bool src2_ready = false;
+  mem_val_t src2_value = 0;
+  rob_index_t src2_index = 0;
+
+  int32_t imm = 0;
+  uint8_t dst_reg = 0;
+
+  mem_ptr_t instr_addr = 0;
+  bool is_branch = false;
+  mem_ptr_t pred_pc = 0;
+
+  auto operator<=>(const WH_DU_RS &) const = default;
+};
+
+struct WH_RS_ALU {
+  bool is_valid = false;
+  rob_index_t rob_index = 0;
+  InstrType instr_type = InstrType::INVALID;
+  mem_val_t src1_value = 0;
+  mem_val_t src2_value = 0;
+  int32_t imm = 0;
+  uint8_t dst_reg = 0;
+  mem_ptr_t instr_addr = 0;
+
+  bool is_branch = false;
+  mem_ptr_t pred_pc = 0;
+
+  auto operator<=>(const WH_RS_ALU &) const = default;
+};
+
+struct WH_ALU_RS {
+  bool can_accept_instr = false;
+  auto operator<=>(const WH_ALU_RS &) const = default;
+};
+
+struct WH_RS_DU {
+  bool can_accept_instr = false;
+  auto operator<=>(const WH_RS_DU &) const = default;
+};
+
+
+
+
+
+
+
+
+
+
+
 
 }
 

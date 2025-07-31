@@ -112,6 +112,7 @@ public:
   explicit Instruction(raw_instr_t raw_instr) { resolve(raw_instr); }
 
   void resolve(raw_instr_t raw_instr) {
+    _raw_instr = raw_instr;
     _type = InstrType::INVALID;
     _rs2_shamt = slice_bytes<uint8_t, 24, 20>(raw_instr);
     _rs1       = slice_bytes<uint8_t, 19, 15>(raw_instr);
@@ -139,6 +140,7 @@ public:
     case opcode_t::JALR: {
       _type = InstrType::JALR;
       _imm = slice_bytes<int32_t, 31, 20>(raw_instr);
+      _imm = sign_extend<int32_t, 12>(_imm);
     } break;
     case opcode_t::B_INSTR: {
       auto imm12    = slice_bytes<int32_t, 31, 31>(raw_instr);
@@ -146,6 +148,7 @@ public:
       auto imm4_1   = slice_bytes<int32_t, 11,  8>(raw_instr);
       auto imm11    = slice_bytes<int32_t,  7,  7>(raw_instr);
       _imm = (imm12 << 12) | (imm11 << 11)| (imm10_5 << 5) | (imm4_1 << 1);
+      _imm = sign_extend<int32_t, 13>(_imm);
       switch(static_cast<b_instr_code>(funct3)) {
       case b_instr_code::BEQ:  _type = InstrType::BEQ;  break;
       case b_instr_code::BNE:  _type = InstrType::BNE;  break;
@@ -159,6 +162,7 @@ public:
     }  break;
     case opcode_t::L_INSTR: {
       _imm = slice_bytes<int32_t, 31, 20>(raw_instr);
+      _imm = sign_extend<int32_t, 12>(_imm);
       switch(static_cast<l_instr_code>(funct3)) {
       case l_instr_code::LB:  _type = InstrType::LB;  break;
       case l_instr_code::LH:  _type = InstrType::LH;  break;
@@ -173,6 +177,7 @@ public:
       auto imm11_5 = slice_bytes<int32_t, 31, 25>(raw_instr);
       auto imm4_0  = slice_bytes<int32_t, 11,  7>(raw_instr);
       _imm = (imm11_5 << 5) | (imm4_0 << 0);
+      _imm = sign_extend<int32_t, 12>(_imm);
       switch(static_cast<s_instr_code>(funct3)) {
       case s_instr_code::SB: _type = InstrType::SB; break;
       case s_instr_code::SH: _type = InstrType::SH; break;
@@ -183,6 +188,7 @@ public:
     } break;
     case opcode_t::I_INSTR: {
       _imm = slice_bytes<int32_t, 31, 20>(raw_instr);
+      _imm = sign_extend<int32_t, 12>(_imm);
       switch(static_cast<i_instr_code>(funct3)) {
       case i_instr_code::ADDI:  _type = InstrType::ADDI;  break;
       case i_instr_code::SLTI:  _type = InstrType::SLTI;  break;
@@ -190,8 +196,9 @@ public:
       case i_instr_code::XORI:  _type = InstrType::XORI;  break;
       case i_instr_code::ORI:   _type = InstrType::ORI;   break;
       case i_instr_code::ANDI:  _type = InstrType::ANDI;  break;
-      case i_instr_code::SLLI:  _type = InstrType::SLLI;  break;
+      case i_instr_code::SLLI:  _type = InstrType::SLLI; _imm = _rs2_shamt;  break;
       case i_instr_code::SRLI_SRAI: {
+        _imm = _rs2_shamt;
         switch(static_cast<srli_srai_code>(funct7)) {
         case srli_srai_code::SRLI: _type = InstrType::SRLI; break;
         case srli_srai_code::SRAI: _type = InstrType::SRAI; break;
@@ -236,32 +243,92 @@ public:
     }
   }
 
-  [[nodiscard]] bool valid() const { return _type != InstrType::INVALID; }
-  [[nodiscard]] InstrType type() const { return _type; }
-  [[nodiscard]] uint8_t rs1() const { return _rs1; }
-  [[nodiscard]] uint8_t rs2() const { return _rs2_shamt; }
-  [[nodiscard]] uint8_t rd() const { return _rd; }
-  [[nodiscard]] uint8_t shamt() const { return _rs2_shamt; }
-  [[nodiscard]] int32_t imm() const { return _imm; }
+  raw_instr_t raw_instr() const { return _raw_instr; }
+  bool valid() const { return _type != InstrType::INVALID; }
+  InstrType type() const { return _type; }
+  uint8_t rs1() const { return _rs1; }
+  uint8_t rs2() const { return _rs2_shamt; }
+  uint8_t rd() const { return _rd; }
+  uint8_t shamt() const { return _rs2_shamt; }
+  int32_t imm() const { return _imm; }
 
-  [[nodiscard]] bool is_br() const {
+  bool has_src1() const {
+    return !(_type == InstrType::LUI || _type == InstrType::AUIPC || _type == InstrType::JAL ||
+      _type == InstrType::INVALID);
+  }
+
+  bool has_src2() const {
+    switch(_type) {
+    case InstrType::ADD: case InstrType::SUB:  case InstrType::SLL:
+    case InstrType::SLT: case InstrType::SLTU: case InstrType::XOR:
+    case InstrType::SRL: case InstrType::SRA:  case InstrType::OR:
+    case InstrType::AND:
+    case InstrType::BEQ: case InstrType::BNE:  case InstrType::BLT:
+    case InstrType::BGE: case InstrType::BLTU: case InstrType::BGEU:
+    case InstrType::SB:  case InstrType::SH:   case InstrType::SW:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  bool write_rf() const {
+    switch(_type) {
+    case InstrType::BEQ: case InstrType::BNE:  case InstrType::BLT:
+    case InstrType::BGE: case InstrType::BLTU: case InstrType::BGEU:
+    case InstrType::SB:  case InstrType::SH:   case InstrType::SW:
+    case InstrType::INVALID:
+      return false;
+    default:
+      return true;
+    }
+  }
+
+  bool is_load() const {
+    return _type == InstrType::LB || _type == InstrType::LH || _type == InstrType::LW ||
+      _type == InstrType::LBU || _type == InstrType::LHU;
+  }
+
+  bool is_store() const {
+    return _type == InstrType::SB || _type == InstrType::SH || _type == InstrType::SW;
+  }
+
+  bool is_br() const {
     return _type == InstrType::BEQ || _type == InstrType::BNE || _type == InstrType::BGE ||
       _type == InstrType::BLT || _type == InstrType::BGEU || _type == InstrType::BLTU;
   }
 
-  [[nodiscard]] bool is_jal() const {
+  bool is_jal() const {
     return _type == InstrType::JAL;
   }
 
-  [[nodiscard]] bool is_jalr() const {
+  bool is_jalr() const {
     return _type == InstrType::JALR;
   }
 
+  mptr_diff_t mem_data_len() const {
+    switch(_type) {
+    case InstrType::LB: case InstrType::LBU: case InstrType::SB: return 1;
+    case InstrType::LH: case InstrType::LHU: case InstrType::SH: return 2;
+    case InstrType::LW: case InstrType::SW: return 4;
+    default: return 0;
+    }
+  }
+
+  mem_ptr_t branch_target_pc(mem_ptr_t current_pc, mem_val_t rs1_val) const {
+    if(is_br() || _type == InstrType::JAL) {
+      return current_pc + _imm;
+    }
+    if(is_jalr()) {
+      return (rs1_val + _imm) & ~static_cast<mem_ptr_t>(0b1);
+    }
+    return current_pc + 4;
+  }
 
   auto operator<=>(const Instruction &) const = default; // should be alright
 
 private:
-  // raw_instr_t _instr;
+  raw_instr_t _raw_instr;
   InstrType _type;
   // uint8_t  _funct3;    // instr[14:12]
   // uint8_t  _funct7;    // instr[31:25]

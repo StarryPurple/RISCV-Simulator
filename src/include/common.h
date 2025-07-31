@@ -21,7 +21,8 @@ constexpr std::size_t IFUSize = 8;
 constexpr std::size_t ROBSize = 16;
 constexpr std::size_t LSBSize = 16;
 constexpr std::size_t RSSize  = 16;
-constexpr std::size_t CDBCap  = 16;
+// constexpr std::size_t CDBCap  = 16;
+constexpr std::size_t RFSize  = 32;
 
 constexpr std::size_t RAMInstrOffset = 1 << 21; // 2KB
 
@@ -43,7 +44,7 @@ constexpr std::size_t RAMInstrOffset = 1 << 21; // 2KB
 class CPUModule {
 public:
   CPUModule() = default;
-  virtual ~CPUModule() = 0;
+  ~CPUModule() = default;
 
   // synchronous sequential logic update. Called once every clock cycle by CPU.
   // You can build a brand-new module object with old fields, and replace the old object with the new one.

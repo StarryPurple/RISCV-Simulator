@@ -9,7 +9,7 @@ namespace insomnia {
 
 // memory is in small endian.
 template <std::size_t RAMCap, std::size_t InstrOffset>
-class MIU : public CPUModule {
+class MemoryInterfaceUnit : public CPUModule {
   enum class State {
     IDLE, LSB_LOAD, LSB_STORE, IFU_FETCH
   };
@@ -20,7 +20,7 @@ class MIU : public CPUModule {
     clock_t clk_delay;
   };
 public:
-  MIU(
+  MemoryInterfaceUnit(
     std::shared_ptr<const WH_LSB_MIU> lsb_input,
     std::shared_ptr<const WH_IFU_MIU> ifu_input,
     std::shared_ptr<WH_MIU_IFU> ifu_output,
@@ -48,20 +48,20 @@ public:
       try_process();
     } break;
     case State::LSB_LOAD: {
-      if(--_nxt_regs.cycle_remain == 0) {
+      if(--_nxt_regs.clk_delay == 0) {
         lsb_output.is_valid = true;
         lsb_output.value = read_mem(_cur_regs.addr, _cur_regs.data_len);
         try_process();
       }
     } break;
     case State::LSB_STORE: {
-      if(--_nxt_regs.cycle_remain == 0) {
+      if(--_nxt_regs.clk_delay == 0) {
         write_mem(_cur_regs.addr, _cur_regs.data_len, _cur_regs.value);
         try_process();
       }
     } break;
     case State::IFU_FETCH: {
-      if(--_nxt_regs.cycle_remain == 0) {
+      if(--_nxt_regs.clk_delay == 0) {
         ifu_output.is_valid = true;
         ifu_output.instr = static_cast<raw_instr_t>(
           read_mem(_cur_regs.addr + InstrOffset, _cur_regs.data_len));
@@ -106,18 +106,18 @@ private:
     if(_lsb_input->is_load_request) {
       _nxt_regs.addr = _lsb_input->addr;
       _nxt_regs.data_len = _lsb_input->data_len;
-      _nxt_regs.cycle_remain = 3;
+      _nxt_regs.clk_delay = 3;
       _nxt_stat = State::LSB_LOAD;
     } else if(_lsb_input->is_store_request) {
       _nxt_regs.addr = _lsb_input->addr;
       _nxt_regs.data_len = _lsb_input->data_len;
       _nxt_regs.value = _lsb_input->value;
-      _nxt_regs.cycle_remain = 3;
+      _nxt_regs.clk_delay = 3;
       _nxt_stat = State::LSB_STORE;
     } else if(_ifu_input->is_valid) {
       _nxt_regs.addr = _ifu_input->pc;
       _nxt_regs.data_len = 4; // fixed
-      _nxt_regs.cycle_remain = 3;
+      _nxt_regs.clk_delay = 3;
       _nxt_stat = State::IFU_FETCH;
     }
   }

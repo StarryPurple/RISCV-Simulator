@@ -16,27 +16,30 @@ class InstructionFetchUnit : public CPUModule {
     HANDLE_BR_JMP,
   };
   struct Registers {
-    circular_queue<std::pair<raw_instr_t, mem_ptr_t>, IFUSize> queue; // raw instructions
+    circular_queue<std::pair<raw_instr_t, mem_ptr_t>, BufSize> queue; // raw instructions
     mem_ptr_t pc; // managed here
     bool is_fetching; // waiting for iFetch reply. do not try to send another request when waiting.
     // clock_t clk_delay;
+    Registers(mem_ptr_t _pc) : pc(_pc), is_fetching(false) {}
   };
 
 public:
   InstructionFetchUnit(
+    mem_ptr_t pc,
     std::shared_ptr<const WH_MIU_IFU> miu_input,
     std::shared_ptr<const WH_PRED_IFU> pred_input,
     std::shared_ptr<const WH_FLUSH_CDB> flush_input,
+    std::shared_ptr<const WH_DU_IFU> du_input,
     std::shared_ptr<WH_IFU_MIU> miu_output,
     std::shared_ptr<WH_IFU_PRED> pred_output,
     std::shared_ptr<WH_IFU_DU> du_output
     ) :
   _miu_input(std::move(miu_input)), _pred_input(std::move(pred_input)),
-  _flush_input(std::move(flush_input)),
+  _flush_input(std::move(flush_input)), _du_input(std::move(du_input)),
   _miu_output(std::move(miu_output)), _pred_output(std::move(pred_output)),
   _du_output(std::move(du_output)),
   _cur_stat(State::IDLE), _nxt_stat(State::IDLE),
-  _cur_regs(), _nxt_regs() {}
+  _cur_regs(pc), _nxt_regs(pc) {}
 
   void sync() override {
     _cur_stat = _nxt_stat;
@@ -79,13 +82,15 @@ public:
       case State::HANDLE_BR_JMP: {
           if(_pred_input->is_valid) {
             _nxt_regs.pc = _pred_input->pred_pc;
-            if(!_nxt_regs.queue.empty()) {
+            if(_du_input->can_accept_req && !_nxt_regs.queue.empty()) {
               // not flushed
               du_output.is_valid = true;
               auto [raw_instr, instr_addr] = _nxt_regs.queue.front();
               du_output.raw_instr = raw_instr;
               du_output.instr_addr = instr_addr;
               _nxt_regs.queue.pop();
+            } else {
+              break;
             }
             try_process(miu_output, pred_output, du_output);
           }
@@ -113,6 +118,7 @@ private:
   const std::shared_ptr<const WH_MIU_IFU> _miu_input;
   const std::shared_ptr<const WH_PRED_IFU> _pred_input;
   const std::shared_ptr<const WH_FLUSH_CDB> _flush_input;
+  const std::shared_ptr<const WH_DU_IFU> _du_input;
   const std::shared_ptr<WH_IFU_MIU> _miu_output;
   const std::shared_ptr<WH_IFU_PRED> _pred_output;
   const std::shared_ptr<WH_IFU_DU> _du_output;
@@ -125,25 +131,30 @@ private:
     if(!_nxt_regs.queue.empty()) {
       auto [raw_instr, instr_addr] = _nxt_regs.queue.front();
       auto instr = Instruction{raw_instr}; // stimulation of pre decoding
-      if(instr.is_jal()) {
-        _nxt_regs.pc = instr_addr + instr.imm();
-        du_output.is_valid = true;
-        du_output.raw_instr = raw_instr;
-        du_output.instr_addr = instr_addr;
-        _nxt_regs.queue.pop();
-        _nxt_stat = State::IDLE;
-      } else if(instr.is_br()|| instr.is_jalr()) {
-        pred_output.is_valid = true;
-        pred_output.instr_addr = instr_addr;
-        pred_output.is_br = instr.is_br();
-        pred_output.is_jalr = instr.is_jalr();
-        _nxt_stat = State::HANDLE_BR_JMP;
+      if(_du_input->can_accept_req) {
+
+        if(instr.is_jal()) {
+          _nxt_regs.pc = instr_addr + instr.imm();
+          du_output.is_valid = true;
+          du_output.raw_instr = raw_instr;
+          du_output.instr_addr = instr_addr;
+          _nxt_regs.queue.pop();
+          _nxt_stat = State::IDLE;
+        } else if(instr.is_br()|| instr.is_jalr()) {
+          pred_output.is_valid = true;
+          pred_output.instr_addr = instr_addr;
+          pred_output.is_br = instr.is_br();
+          pred_output.is_jalr = instr.is_jalr();
+          _nxt_stat = State::HANDLE_BR_JMP;
+        } else {
+          du_output.is_valid = true;
+          du_output.raw_instr = raw_instr;
+          du_output.instr_addr = instr_addr;
+          _nxt_regs.queue.pop();
+          _nxt_stat = State::IDLE;
+        }
       } else {
-        du_output.is_valid = true;
-        du_output.raw_instr = raw_instr;
-        du_output.instr_addr = instr_addr;
-        _nxt_regs.queue.pop();
-        _nxt_stat = State::IDLE;
+        _nxt_stat = _cur_stat;
       }
     } else if(!_nxt_regs.queue.full() && !_nxt_regs.is_fetching) {
       // fetch one

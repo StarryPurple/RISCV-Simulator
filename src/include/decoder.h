@@ -6,6 +6,7 @@
 
 namespace insomnia {
 
+/*
 class Decoder : public CPUModule {
   enum class State {
     IDLE, DECODE
@@ -75,6 +76,7 @@ private:
     }
   }
 };
+*/
 
 }
 

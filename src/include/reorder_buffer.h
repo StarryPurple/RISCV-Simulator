@@ -29,6 +29,8 @@ class ReorderBuffer : public CPUModule {
     bool write_rf; // whether rf write is needed
     rf_index_t dst_reg; // 0~31, RF index
     mem_val_t rf_value; // execution result
+
+    raw_instr_t raw_instr;
   };
   struct Registers {
     circular_queue<Entry, BufSize> queue; // entries
@@ -36,7 +38,7 @@ class ReorderBuffer : public CPUModule {
 public:
   ReorderBuffer(
     std::shared_ptr<const WH_DU_ROB> du_input,
-    std::shared_ptr<const WH_DATA_CDB> data_input,
+    std::shared_ptr<const WH_CDB_OUT> data_input,
     std::shared_ptr<WH_ROB_LSB> lsb_output,
     std::shared_ptr<WH_ROB_DU> du_output,
     std::shared_ptr<WH_ROB_PRED> pred_output,
@@ -80,24 +82,23 @@ public:
         .store_addr = _du_input->store_addr,
         .store_value = _du_input->store_value,
         .data_len = _du_input->data_len,
+        .write_rf = _du_input->write_rf,
         .dst_reg = _du_input->dst_reg,
-        .write_rf = _du_input->write_rf
+        .raw_instr = _du_input->raw_instr
       });
       du_output.rob_index = _nxt_regs.queue.back_index();
     }
-    for(const auto &entry: _data_input->entries) {
-      if(entry.is_valid) {
-        auto &record = _nxt_regs.queue.at(entry.rob_index);
-        record.is_ready = true;
-        if(record.is_br || record.is_jalr) {
-          record.real_pc = entry.real_pc;
-        }
-        if(record.is_store) {
-          record.store_value = entry.value;
-        }
-        if(record.write_rf) {
-          record.rf_value = entry.value;
-        }
+    if(_data_input->entry.is_valid) {
+      auto &record = _nxt_regs.queue.at(_data_input->entry.rob_index);
+      record.is_ready = true;
+      if(record.is_br || record.is_jalr) {
+        record.real_pc = _data_input->entry.real_pc;
+      }
+      if(record.is_store) {
+        record.store_value = _data_input->entry.value;
+      }
+      if(record.write_rf) {
+        record.rf_value = _data_input->entry.value;
       }
     }
     if(!_nxt_regs.queue.empty() && _nxt_regs.queue.front().is_ready) {
@@ -122,6 +123,7 @@ public:
           rf_output.is_valid = true;
           rf_output.dst_reg = record.dst_reg;
           rf_output.value = record.rf_value;
+          rf_output.raw_instr = record.raw_instr;
           _nxt_regs.queue.pop();
         }
       } else if(record.is_store) {
@@ -136,6 +138,7 @@ public:
         rf_output.is_valid = true;
         rf_output.dst_reg = record.dst_reg;
         rf_output.value = record.rf_value;
+        rf_output.raw_instr = record.raw_instr;
         _nxt_regs.queue.pop();
       }
     }
@@ -165,7 +168,7 @@ public:
   }
 private:
   const std::shared_ptr<const WH_DU_ROB> _du_input;
-  const std::shared_ptr<const WH_DATA_CDB> _data_input;
+  const std::shared_ptr<const WH_CDB_OUT> _data_input;
   const std::shared_ptr<WH_ROB_LSB> _lsb_output;
   const std::shared_ptr<WH_ROB_DU> _du_output;
   const std::shared_ptr<WH_ROB_PRED> _pred_output;
