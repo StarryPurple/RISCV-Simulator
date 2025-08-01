@@ -57,7 +57,7 @@ public:
   }
 
   bool update() override {
-    debug("RS update start");
+    debug("RS");
     _nxt_regs = _cur_regs;
 
     WH_RS_ALU alu_output{};
@@ -173,7 +173,6 @@ public:
       update_signal = true;
     }
 
-    debug("RS update end");
     return update_signal;
   }
 

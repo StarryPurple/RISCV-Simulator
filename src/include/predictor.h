@@ -32,7 +32,7 @@ public:
     _cur_regs = std::move(_nxt_regs); // to reduce C++ simulation time
   }
   bool update() override {
-    debug("PRED update start");
+    debug("PRED");
     _nxt_regs = _cur_regs;
 
     WH_PRED_IFU ifu_output{};
@@ -89,7 +89,6 @@ public:
       *_ifu_output = ifu_output;
       update_signal = true;
     }
-    debug("PRED update end");
     return update_signal;
   }
 private:

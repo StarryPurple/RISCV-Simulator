@@ -22,7 +22,7 @@ namespace insomnia {
 
 class CPU {
   // module type alias
-  using MIU  = MemoryInterfaceUnit<RAMSize, RAMInstrOffset>;
+  using MIU  = MemoryInterfaceUnit<RAMSize>;
   // using DEC  = Decoder;
   using IFU  = InstructionFetchUnit<IFUSize>;
   using DU   = DispatchUnit;
@@ -201,7 +201,7 @@ public:
       raw_instr = (raw_instr << 4) | hex2dec(ch);
       if(++hex_cnt == 8) {
         raw_instr = ToSmallEndian32_8(raw_instr);
-        _miu->preload_instruction(raw_instr, cur_ptr + diff_ptr);
+        _miu->preload_program(raw_instr, cur_ptr + diff_ptr);
         hex_cnt = 0;
         raw_instr = 0;
         diff_ptr += 4;
@@ -211,7 +211,7 @@ public:
   bool tick() {
     ++_clk;
 
-    debug("Clock cycle " + std::to_string(_clk) + ":");
+    debug("Clock cycle " + std::to_string(_clk) + ":++++++++++++++++++");
     for(bool stabilized = false; !stabilized; ) {
       debug("Try update-----------");
       stabilized = true;
@@ -219,7 +219,7 @@ public:
       // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
       for(auto &module: _modules) {
         bool res = module->update();
-        debug(res ? "Updated" : "Stable");
+        debug(res ? "Updated" : "Not updated");
         if(res) stabilized = false;
       }
     }

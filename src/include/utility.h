@@ -9,13 +9,13 @@ namespace insomnia {
 // sign extension. Len is for the expected digit number of the value.
 template <std::integral T, int Len>
 T sign_extend(T val) {
-  return (val & (1 << (Len - 1))) ? (val | (-1u << val)) : (val & ~(-1u << val));
+  return (val & (1 << (Len - 1))) ? (val | (-1u << Len)) : (val & ~(-1u << Len));
 }
 
 // sign extension. Len is for the expected digit number of the value.
 template <std::integral T, int Len>
 T sign_extend(T val, bool is_one) {
-  return is_one ? (val | (-1u << val)) : (val & ~(-1u << val));
+  return is_one ? (val | (-1u << Len)) : (val & ~(-1u << Len));
 }
 
 inline bool is_delim(char c) {

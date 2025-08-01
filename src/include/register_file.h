@@ -7,7 +7,13 @@
 namespace insomnia {
 
 class RegisterFile : public CPUModule {
-  using Registers = std::array<mem_val_t, RFSize>;
+  enum class State {
+    IDLE, READING
+  };
+  struct Registers {
+    std::array<mem_val_t, RFSize> arr;
+    mem_val_t Vi, Vj;
+  };
 public:
   RegisterFile(
     std::shared_ptr<const WH_DU_RF> du_input,
@@ -16,28 +22,44 @@ public:
     ) :
   _du_input(std::move(du_input)), _rob_input(std::move(rob_input)),
   _du_output(std::move(du_output)),
-  _cur_regs(), _nxt_regs() {}
+  _cur_regs(), _nxt_regs(),
+  _cur_stat(State::IDLE), _nxt_stat(State::IDLE) {}
   void sync() override {
     _cur_regs = _nxt_regs;
-    _cur_regs[0] = 0; // fix x0 = 0
+    _cur_stat = _nxt_stat;
+    _cur_regs.arr[0] = 0; // fix x0 = 0
   }
   bool update() override {
-    debug("RF update start");
+    debug("RF");
     _nxt_regs = _cur_regs;
+    _nxt_stat = _cur_stat;
 
     WH_RF_DU du_output{};
 
     if(_rob_input->is_valid) {
-      _nxt_regs[_rob_input->dst_reg] = _rob_input->value;
+      _nxt_regs.arr[_rob_input->dst_reg] = _rob_input->value;
+      debug("Reg" + std::to_string(_rob_input->dst_reg) + " is now " + std::to_string(_rob_input->value));
     }
-    if(_du_input->is_valid) {
+
+    switch(_nxt_stat) {
+    case State::IDLE: {
+      if(_du_input->is_valid) {
+        if(_du_input->reqRi) {
+          _nxt_regs.Vi = _nxt_regs.arr[_du_input->Ri];
+        }
+        if(_du_input->reqRj) {
+          _nxt_regs.Vj = _nxt_regs.arr[_du_input->Rj];
+        }
+        _nxt_stat = State::READING;
+      }
+    } break;
+
+    case State::READING: {
       du_output.is_valid = true;
-      if(_du_input->reqRi) {
-        du_output.Vi = _nxt_regs[_du_input->Ri];
-      }
-      if(_du_input->reqRj) {
-        du_output.Vj = _nxt_regs[_du_input->Rj];
-      }
+      du_output.Vi = _nxt_regs.Vi;
+      du_output.Vj = _nxt_regs.Vj;
+      _nxt_stat = State::IDLE; // only broadcast for 1 cycle
+    } break;
     }
 
     bool update_signal = false;
@@ -45,17 +67,17 @@ public:
       *_du_output = du_output;
       update_signal = true;
     }
-    debug("RF update end");
     return update_signal;
   }
   mem_ptr_t get_reg(int i) const {
-    return _cur_regs[i];
+    return _cur_regs.arr[i];
   }
 private:
   const std::shared_ptr<const WH_DU_RF> _du_input;
   const std::shared_ptr<const WH_ROB_RF> _rob_input;
   const std::shared_ptr<WH_RF_DU> _du_output;
   Registers _cur_regs, _nxt_regs;
+  State _cur_stat, _nxt_stat;
 };
 
 }

@@ -136,6 +136,7 @@ public:
       auto imm11    = slice_bytes<int32_t, 20, 20>(raw_instr);
       auto imm19_12 = slice_bytes<int32_t, 19, 12>(raw_instr);
       _imm = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
+      _imm = sign_extend<int32_t, 21>(_imm);
     } break;
     case opcode_t::JALR: {
       _type = InstrType::JALR;

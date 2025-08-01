@@ -95,6 +95,16 @@ public:
     return _data[index];
   }
 
+  bool index_valid(std::size_t index) const {
+    std::size_t f = _rear + _size - 1;
+    if(f > Len) {
+      if(f - Len < index && index < _rear) return false;
+    } else {
+      if(index < _rear || index > f) return false;
+    }
+    return true;
+  }
+
 private:
   T _data[Len]{};
   std::size_t _rear = 0, _size = 0;

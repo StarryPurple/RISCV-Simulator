@@ -18,7 +18,7 @@ public:
   _output(std::move(output)) {}
   void sync() override {}
   bool update() override {
-    debug("CDB update start");
+    debug("CDB");
     WH_CDB_OUT output{};
     // lsb first. alu second.
     if(_lsb_input->entry.is_valid) {
@@ -27,12 +27,15 @@ public:
       output.entry = _alu_input->entry;
     }
 
+    if(output.entry.is_valid)
+      debug("Broadcast: " + std::to_string(output.entry.rob_index) + ", " + std::to_string(output.entry.value)
+      + ", " + std::to_string(output.entry.real_pc));
+
     bool update_signal = false;
     if(*_output != output) {
       *_output = output;
       update_signal = true;
     }
-    debug("CDB update end");
     return update_signal;
   }
 

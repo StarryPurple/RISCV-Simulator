@@ -89,7 +89,7 @@ struct WH_ROB_PRED {
 };
 
 struct WH_ROB_DU {
-  bool is_valid = false;
+  bool is_alloc_valid = false;
   rob_index_t rob_index;
 
   auto operator<=>(const WH_ROB_DU &) const = default;

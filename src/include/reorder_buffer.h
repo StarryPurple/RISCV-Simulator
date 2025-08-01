@@ -55,7 +55,7 @@ public:
     _cur_regs = _nxt_regs;
   }
   bool update() override {
-    debug("ROB update start");
+    debug("ROB");
     _nxt_regs = _cur_regs;
 
     WH_ROB_LSB lsb_output{};
@@ -87,10 +87,10 @@ public:
         .dst_reg = _du_input->dst_reg,
         .raw_instr = _du_input->raw_instr
       });
-      du_output.is_valid = true;
+      du_output.is_alloc_valid = true;
       du_output.rob_index = _nxt_regs.queue.back_index();
     }
-    if(_data_input->entry.is_valid) {
+    if(_data_input->entry.is_valid && _nxt_regs.queue.index_valid(_data_input->entry.rob_index)) {
       auto &record = _nxt_regs.queue.at(_data_input->entry.rob_index);
       record.is_ready = true;
       if(record.is_br || record.is_jalr) {
@@ -105,14 +105,11 @@ public:
     }
     if(!_nxt_regs.queue.empty() && _nxt_regs.queue.front().is_ready) {
       auto record = _nxt_regs.queue.front();
-#ifdef ISM_DEBUG
-      std::cerr << std::hex << record.instr_addr << " : " << record.raw_instr << std::endl;
-#endif
+      debug("ROB commited instr " + std::to_string(record.raw_instr) + " at address " + std::to_string(record.instr_addr));
       if(record.raw_instr == 0x0ff00513) {
-        // terminate program. stop.
+        // terminate program. stop. The rest instructions (with this write) is ignored.
         terminate = true;
-      }
-      if(record.is_br || record.is_jalr) {
+      } else if(record.is_br || record.is_jalr) {
         // A branch/jalr instruction.
         // PRED interaction
         pred_output.is_valid = true;
@@ -133,14 +130,12 @@ public:
           rf_output.dst_reg = record.dst_reg;
           rf_output.value = record.rf_value;
           rf_output.raw_instr = record.raw_instr;
-          _nxt_regs.queue.pop();
         }
       } else if(record.is_store || record.is_load) {
         // A memory interaction instruction.
         // LSB interaction
         lsb_output.is_valid = true;
         lsb_output.rob_index = _nxt_regs.queue.front_index();
-        _nxt_regs.queue.pop();
       } else {
         // just a normal arithmetic instruction.
         // RF interaction
@@ -148,8 +143,9 @@ public:
         rf_output.dst_reg = record.dst_reg;
         rf_output.value = record.rf_value;
         rf_output.raw_instr = record.raw_instr;
-        _nxt_regs.queue.pop();
       }
+      if(!_nxt_regs.queue.empty()) // no flushed
+        _nxt_regs.queue.pop();
     }
 
     bool update_signal = false;
@@ -173,7 +169,6 @@ public:
       *_flush_output = flush_output;
       update_signal = true;
     }
-    debug("ROB update end");
     return update_signal;
   }
   bool to_terminate() const {

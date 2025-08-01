@@ -59,6 +59,7 @@ class LoadStoreBuffer : public CPUModule {
     }
 
     bool update() override {
+      debug("LSB");
       _nxt_regs = _cur_regs;
 
       WH_LSB_MIU miu_output{};

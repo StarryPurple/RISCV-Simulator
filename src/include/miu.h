@@ -8,7 +8,7 @@ namespace insomnia {
 // Maybe someone will implement a RAM here.
 
 // memory is in small endian.
-template <std::size_t RAMCap, std::size_t InstrOffset>
+template <std::size_t RAMCap>
 class MemoryInterfaceUnit : public CPUModule {
   enum class State {
     IDLE, LSB_LOAD, LSB_STORE, IFU_FETCH
@@ -37,7 +37,7 @@ public:
     _cur_regs = _nxt_regs;
   }
   bool update() override {
-    debug("MIU update start");
+    debug("MIU");
     _nxt_stat = _cur_stat;
     _nxt_regs = _cur_regs;
 
@@ -52,12 +52,16 @@ public:
       if(--_nxt_regs.clk_delay == 0) {
         lsb_output.is_valid = true;
         lsb_output.value = read_mem(_cur_regs.addr, _cur_regs.data_len);
+        debug("Load data: " + std::to_string(lsb_output.value) + " with data len " + std::to_string(_cur_regs.data_len)
+          + " at address " + std::to_string(_cur_regs.addr));
         try_process();
       }
     } break;
     case State::LSB_STORE: {
       if(--_nxt_regs.clk_delay == 0) {
         write_mem(_cur_regs.addr, _cur_regs.data_len, _cur_regs.value);
+        debug("Store data: " + std::to_string(_cur_regs.value) + " with data len " + std::to_string(_cur_regs.data_len)
+          + " at address " + std::to_string(_cur_regs.addr));
         try_process();
       }
     } break;
@@ -65,8 +69,10 @@ public:
       if(--_nxt_regs.clk_delay == 0) {
         ifu_output.is_valid = true;
         ifu_output.instr = static_cast<raw_instr_t>(
-          read_mem(_cur_regs.addr + InstrOffset, _cur_regs.data_len));
+          read_mem(_cur_regs.addr, _cur_regs.data_len));
         ifu_output.instr_addr = _cur_regs.addr;
+        debug("Load instr: " + std::to_string(ifu_output.instr) + " with data len " + std::to_string(_cur_regs.data_len)
+        + " at address " + std::to_string(_cur_regs.addr));
         try_process();
       }
     } break;
@@ -82,14 +88,13 @@ public:
       *_lsb_output = lsb_output;
       update_signal = true;
     }
-    debug("MIU update end");
     return update_signal;
   }
 
   // the offset here does not include InstrOffset
-  void preload_instruction(raw_instr_t raw_instr, std::size_t offset) {
+  void preload_program(raw_instr_t raw_instr, std::size_t offset) {
     static_assert(std::is_same_v<raw_instr_t, mem_val_t>);
-    write_mem(InstrOffset + offset, 4, raw_instr);
+    write_mem(offset, 4, raw_instr);
   }
 
 private:

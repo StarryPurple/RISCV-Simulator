@@ -42,7 +42,7 @@ public:
   }
 
   bool update() override {
-    debug("ALU update start");
+    debug("ALU");
     _nxt_regs = _cur_regs;
 
     WH_ALU_CDB cdb_output{};
@@ -73,7 +73,7 @@ public:
       mem_val_t result = 0;
       mem_ptr_t real_branch_pc = 0;
       bool is_branch = false;
-      uint32_t shamt = static_cast<uint32_t>(_nxt_regs.imm) & 0x1F;
+      uint32_t shamt = static_cast<uint32_t>(_nxt_regs.imm) & 0x1f;
 
       switch(_nxt_regs.instr_type) {
       case InstrType::ADD:
@@ -110,19 +110,19 @@ public:
         result = _nxt_regs.src1_value & _nxt_regs.imm;
         break;
       case InstrType::SLL:
-        result = _nxt_regs.src1_value << (_nxt_regs.src2_value & 0x1F); // shamt from rs2 (lower 5 bits)
+        result = _nxt_regs.src1_value << (_nxt_regs.src2_value & 0x1f); // shamt from rs2 (lower 5 bits)
         break;
       case InstrType::SLLI:
         result = _nxt_regs.src1_value << shamt;
         break;
       case InstrType::SRL:
-        result = static_cast<uint32_t>(_nxt_regs.src1_value) >> (_nxt_regs.src2_value & 0x1F);
+        result = static_cast<uint32_t>(_nxt_regs.src1_value) >> (_nxt_regs.src2_value & 0x1f);
         break;
       case InstrType::SRLI:
         result = static_cast<uint32_t>(_nxt_regs.src1_value) >> shamt;
         break;
       case InstrType::SRA:
-        result = _nxt_regs.src1_value >> (_nxt_regs.src2_value & 0x1F);
+        result = _nxt_regs.src1_value >> (_nxt_regs.src2_value & 0x1f);
         break;
       case InstrType::SRAI:
         result = _nxt_regs.src1_value >> shamt;
@@ -222,7 +222,6 @@ public:
       update_signal = true;
     }
 
-    debug("ALU update end");
     return update_signal;
   }
 

@@ -14,7 +14,6 @@ inline void debug(const std::string &str) {
 #endif
 }
 
-
 /********************* global parameters ************************/
 
 using mem_val_t   = uint32_t; // RV32I 4 bytes
@@ -31,8 +30,6 @@ constexpr std::size_t LSBSize = 16;
 constexpr std::size_t RSSize  = 16;
 // constexpr std::size_t CDBCap  = 16;
 constexpr std::size_t RFSize  = 32;
-
-constexpr std::size_t RAMInstrOffset = 1 << 21; // 2KB
 
 /********************* module base ********************************/
 

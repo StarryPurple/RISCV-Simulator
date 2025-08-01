@@ -19,7 +19,6 @@ class DispatchUnit : public CPUModule {
     IDLE,
     FETCHED_DECODED,
     WAIT_ROB_ALLOC,
-    ROB_ALLOCATED,
     WAIT_OPERANDS,
     OPERANDS_READY,
     DISPATCHING,
@@ -41,8 +40,7 @@ class DispatchUnit : public CPUModule {
     mem_val_t src2_value = 0;
     rob_index_t src2_index = 0;
 
-    rf_index_t rd_idx = 0;
-    bool rd_is_valid = false;
+    rf_index_t dst_reg = 0;
 
     bool rob_request_sent = false;
     bool rob_entry_allocated_ack = false;
@@ -84,14 +82,14 @@ public:
   void sync() override {
     _cur_regs = _nxt_regs;
 
-    if(_cur_regs.rob_entry_allocated_ack && _cur_regs.rd_is_valid){
-      _mapping_table[_cur_regs.rd_idx].is_ready = false;
-      _mapping_table[_cur_regs.rd_idx].rob_index = _cur_regs.alloc_rob_index;
+    if(_cur_regs.rob_entry_allocated_ack){
+      _mapping_table[_cur_regs.dst_reg].is_ready = false;
+      _mapping_table[_cur_regs.dst_reg].rob_index = _cur_regs.alloc_rob_index;
     }
 
-    if(_cdb_input->entry.is_valid){
+    if(_cdb_input->entry.is_valid) {
       for(std::size_t i = 0; i < RFSize; ++i){
-        if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _cdb_input->entry.rob_index){
+        if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _cdb_input->entry.rob_index) {
           _mapping_table[i].is_ready = true;
         }
       }
@@ -99,7 +97,7 @@ public:
   }
 
   bool update() override {
-    debug("DU update start");
+    debug("DU");
     _nxt_regs = _cur_regs;
 
     WH_DU_IFU ifu_output{};
@@ -148,26 +146,22 @@ public:
         *_rob_output = rob_output;
         update_signal = true;
       }
-      debug("DU update end");
       return update_signal;
     }
 
-    switch(_cur_regs.state) {
+    switch(_nxt_regs.state) {
     case State::IDLE: {
       if(_ifu_input->is_valid) {
         _nxt_regs.instr_valid = true;
         _nxt_regs.instr = Instruction(_ifu_input->raw_instr);
         _nxt_regs.instr_addr = _ifu_input->instr_addr;
 
-        _nxt_regs.rd_idx = _nxt_regs.instr.rd();
-        _nxt_regs.rd_is_valid = (_nxt_regs.rd_idx != 0);
+        _nxt_regs.dst_reg = _nxt_regs.instr.rd();
 
         _nxt_regs.is_load_store = _nxt_regs.instr.is_load() || _nxt_regs.instr.is_store();
         _nxt_regs.state = State::FETCHED_DECODED;
-        ifu_output.can_accept_req = true;
-      } else {
-        ifu_output.can_accept_req = true;
       }
+      ifu_output.can_accept_req = true;
     } break;
 
     case State::FETCHED_DECODED:
@@ -188,62 +182,59 @@ public:
       rob_output.is_valid = true;
       rob_output.raw_instr = _nxt_regs.instr.raw_instr();
       _nxt_regs.rob_request_sent = true;
-      if(_rob_input->is_valid) {
+      if(_rob_input->is_alloc_valid) {
         _nxt_regs.alloc_rob_index = _rob_input->rob_index;
         _nxt_regs.rob_entry_allocated_ack = true;
-        _nxt_regs.state = State::ROB_ALLOCATED;
+
+        // fetch rf data using the old mapping table
+        rf_index_t rs1_idx = _nxt_regs.instr.rs1();
+        if(!_nxt_regs.instr.has_src1() || rs1_idx == 0) {
+          _nxt_regs.src1_ready = true;
+          _nxt_regs.src1_value = 0;
+          _nxt_regs.src1_index = 0;
+        } else if(_mapping_table[rs1_idx].is_ready) {
+          rf_output.is_valid = true;
+          rf_output.reqRi = true;
+          rf_output.Ri = rs1_idx;
+          _nxt_regs.src1_ready = false;
+          _nxt_regs.src1_index = 0;
+        } else {
+          _nxt_regs.src1_ready = false;
+          _nxt_regs.src1_index = _mapping_table[rs1_idx].rob_index;
+          _nxt_regs.src1_value = 0;
+        }
+
+        rf_index_t rs2_idx = _nxt_regs.instr.rs2();
+        if(!_nxt_regs.instr.has_src2() || rs2_idx == 0) {
+          _nxt_regs.src2_ready = true;
+          _nxt_regs.src2_value = 0;
+          _nxt_regs.src2_index = 0;
+        } else if(_mapping_table[rs2_idx].is_ready) {
+          rf_output.is_valid = true;
+          rf_output.reqRj = true;
+          rf_output.Rj = rs2_idx;
+          _nxt_regs.src2_ready = false;
+          _nxt_regs.src2_index = 0;
+        } else {
+          _nxt_regs.src2_ready = false;
+          _nxt_regs.src2_index = _mapping_table[rs2_idx].rob_index;
+          _nxt_regs.src2_value = 0;
+        }
+        ifu_output.can_accept_req = false;
+        _nxt_regs.state = State::WAIT_OPERANDS;
       } else {
         _nxt_regs.state = State::WAIT_ROB_ALLOC;
         rob_output.is_valid = true; // ?
       }
-      ifu_output.can_accept_req = false;
-    } break;
-
-    case State::ROB_ALLOCATED: {
-      rf_index_t rs1_idx = _nxt_regs.instr.rs1();
-      if(!_nxt_regs.instr.has_src1() || rs1_idx == 0) {
-        _nxt_regs.src1_ready = true;
-        _nxt_regs.src1_value = 0;
-        _nxt_regs.src1_index = 0;
-      } else if(_mapping_table[rs1_idx].is_ready) {
-        rf_output.is_valid = true;
-        rf_output.reqRi = true;
-        rf_output.Ri = rs1_idx;
-        _nxt_regs.src1_ready = false;
-        _nxt_regs.src1_index = 0;
-      } else {
-        _nxt_regs.src1_ready = false;
-        _nxt_regs.src1_index = _mapping_table[rs1_idx].rob_index;
-        _nxt_regs.src1_value = 0;
-      }
-
-      rf_index_t rs2_idx = _nxt_regs.instr.rs2();
-      if(!_nxt_regs.instr.has_src2() || rs2_idx == 0) {
-        _nxt_regs.src2_ready = true;
-        _nxt_regs.src2_value = 0;
-        _nxt_regs.src2_index = 0;
-      } else if(_mapping_table[rs2_idx].is_ready) {
-        rf_output.is_valid = true;
-        rf_output.reqRj = true;
-        rf_output.Rj = rs2_idx;
-        _nxt_regs.src2_ready = false;
-        _nxt_regs.src2_index = 0;
-      } else {
-        _nxt_regs.src2_ready = false;
-        _nxt_regs.src2_index = _mapping_table[rs2_idx].rob_index;
-        _nxt_regs.src2_value = 0;
-      }
-      ifu_output.can_accept_req = false;
-      _nxt_regs.state = State::WAIT_OPERANDS;
     } break;
 
     case State::WAIT_OPERANDS: {
-      if(_rf_input->is_valid){
-        if(!_nxt_regs.src1_ready){
+      if(_rf_input->is_valid) {
+        if(!_nxt_regs.src1_ready) {
           _nxt_regs.src1_value = _rf_input->Vi;
           _nxt_regs.src1_ready = true;
         }
-        if(!_nxt_regs.src2_ready){
+        if(!_nxt_regs.src2_ready) {
           _nxt_regs.src2_value = _rf_input->Vj;
           _nxt_regs.src2_ready = true;
         }
@@ -263,7 +254,6 @@ public:
       if(_nxt_regs.src1_ready && _nxt_regs.src2_ready){
         _nxt_regs.state = State::OPERANDS_READY;
       }
-      ifu_output.can_accept_req = false;
     } break;
 
     case State::OPERANDS_READY: {
@@ -296,7 +286,7 @@ public:
             .src2_value = _nxt_regs.src2_value,
             .src2_index = _nxt_regs.src2_index,
             .imm = _nxt_regs.instr.imm(),
-            .dst_reg = _nxt_regs.rd_idx,
+            .dst_reg = _nxt_regs.dst_reg,
             .instr_addr = _nxt_regs.instr_addr,
             .is_branch = is_branch_instr,
             .pred_pc = _nxt_regs.instr_addr + 4
@@ -371,7 +361,6 @@ public:
       update_signal = true;
     }
 
-    debug("DU update end");
     return update_signal;
   }
 private:
