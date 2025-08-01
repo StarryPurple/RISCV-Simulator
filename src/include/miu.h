@@ -37,6 +37,7 @@ public:
     _cur_regs = _nxt_regs;
   }
   bool update() override {
+    debug("MIU update start");
     _nxt_stat = _cur_stat;
     _nxt_regs = _cur_regs;
 
@@ -81,6 +82,7 @@ public:
       *_lsb_output = lsb_output;
       update_signal = true;
     }
+    debug("MIU update end");
     return update_signal;
   }
 

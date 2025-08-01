@@ -18,12 +18,13 @@ public:
   _output(std::move(output)) {}
   void sync() override {}
   bool update() override {
-    WH_CDB_OUT output;
+    debug("CDB update start");
+    WH_CDB_OUT output{};
     // lsb first. alu second.
     if(_lsb_input->entry.is_valid) {
-      _output->entry = _lsb_input->entry;
+      output.entry = _lsb_input->entry;
     } else if(_alu_input->entry.is_valid) {
-      _output->entry = _alu_input->entry;
+      output.entry = _alu_input->entry;
     }
 
     bool update_signal = false;
@@ -31,6 +32,7 @@ public:
       *_output = output;
       update_signal = true;
     }
+    debug("CDB update end");
     return update_signal;
   }
 

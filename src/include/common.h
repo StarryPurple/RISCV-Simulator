@@ -5,7 +5,15 @@
 #include <memory> // for std::shared_ptr
 #include <array>
 
+#define ISM_DEBUG
+
 namespace insomnia {
+inline void debug(const std::string &str) {
+#ifdef ISM_DEBUG
+  std::cerr << str << std::endl;
+#endif
+}
+
 
 /********************* global parameters ************************/
 

@@ -3,7 +3,7 @@
 int main() {
   insomnia::CPU cpu;
   cpu.preload_program();
-  while(true)
-    cpu.tick();
+  while(cpu.tick()) {}
+  std::cout << cpu.get_reg(10) << std::endl;
   return 0;
 }

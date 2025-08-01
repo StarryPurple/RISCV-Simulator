@@ -113,6 +113,7 @@ struct WH_ROB_LSB {
 
 struct WH_DU_ROB {
   bool is_valid = false;
+  raw_instr_t raw_instr;
 
   bool is_br = false;
   bool is_jalr = false;
@@ -127,7 +128,6 @@ struct WH_DU_ROB {
   bool write_rf;
   uint8_t dst_reg;
 
-  raw_instr_t raw_instr;
 
   auto operator<=>(const WH_DU_ROB &) const = default;
 };

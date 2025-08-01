@@ -27,14 +27,14 @@ class CommonALU : public CPUModule {
 public:
   CommonALU(
     std::shared_ptr<const WH_RS_ALU> rs_input,
+    std::shared_ptr<const WH_FLUSH_CDB> flush_input,
     std::shared_ptr<WH_ALU_CDB> cdb_output,
-    std::shared_ptr<WH_ALU_RS> rs_output_for_alu,
-    std::shared_ptr<const WH_FLUSH_CDB> flush_input
+    std::shared_ptr<WH_ALU_RS> rs_output
     ) :
   _rs_input(std::move(rs_input)),
-  _cdb_output(std::move(cdb_output)),
-  _alu_output(std::move(rs_output_for_alu)),
   _flush_input(std::move(flush_input)),
+  _cdb_output(std::move(cdb_output)),
+  _rs_output(std::move(rs_output)),
   _cur_regs(), _nxt_regs() {}
 
   void sync() override {
@@ -42,12 +42,12 @@ public:
   }
 
   bool update() override {
+    debug("ALU update start");
     _nxt_regs = _cur_regs;
 
     WH_ALU_CDB cdb_output{};
-    WH_ALU_RS alu_output{};
+    WH_ALU_RS rs_output{};
 
-    bool update_signal = false;
 
     if(_flush_input->is_flush) {
       _nxt_regs.is_busy = false;
@@ -204,30 +204,32 @@ public:
 
       _nxt_regs.is_busy = false;
       _nxt_regs.instr_type = InstrType::INVALID;
-      update_signal = true;
     }
 
-    alu_output = WH_ALU_RS{
+    rs_output = WH_ALU_RS{
       .can_accept_instr = !_nxt_regs.is_busy
     };
+
+    bool update_signal = false;
 
     if(*_cdb_output != cdb_output) {
       *_cdb_output = cdb_output;
       update_signal = true;
     }
 
-    if(*_alu_output != alu_output) {
-      *_alu_output = alu_output;
+    if(*_rs_output != rs_output) {
+      *_rs_output = rs_output;
       update_signal = true;
     }
 
+    debug("ALU update end");
     return update_signal;
   }
 
 private:
   const std::shared_ptr<const WH_RS_ALU> _rs_input;
   const std::shared_ptr<WH_ALU_CDB> _cdb_output;
-  const std::shared_ptr<WH_ALU_RS> _alu_output;
+  const std::shared_ptr<WH_ALU_RS> _rs_output;
   const std::shared_ptr<const WH_FLUSH_CDB> _flush_input;
 
   Registers _cur_regs, _nxt_regs;

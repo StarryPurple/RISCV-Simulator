@@ -10,15 +10,16 @@ namespace insomnia {
 template <std::size_t BufSize>
 class ReorderBuffer : public CPUModule {
   struct Entry {
-    bool is_ready; // whether the result is valid
+    bool is_ready = false; // whether the result is valid
 
-    bool is_br; // in case the predictor needs it
-    bool is_jalr;
+    bool is_br = false; // in case the predictor needs it
+    bool is_jalr = false;
     mem_ptr_t instr_addr;
     mem_ptr_t pred_pc; // the pc provided by predictor
     mem_ptr_t real_pc; // the pc calculated
 
-    bool is_store; // in case the LSB needs it
+    bool is_load = false;
+    bool is_store = false; // in case the LSB needs it
     mem_ptr_t store_addr; // valid when is_store is true
     mem_val_t store_value; // valid when is_store is true
     mptr_diff_t data_len; // valid
@@ -26,7 +27,7 @@ class ReorderBuffer : public CPUModule {
     // The following is not valid at branch instructions.
     // But they are valid at jump instructions, since they too have a register write-in.
 
-    bool write_rf; // whether rf write is needed
+    bool write_rf = false; // whether rf write is needed
     rf_index_t dst_reg; // 0~31, RF index
     mem_val_t rf_value; // execution result
 
@@ -54,6 +55,7 @@ public:
     _cur_regs = _nxt_regs;
   }
   bool update() override {
+    debug("ROB update start");
     _nxt_regs = _cur_regs;
 
     WH_ROB_LSB lsb_output{};
@@ -71,7 +73,6 @@ public:
 
     // This instruction might be flushed, so it must be judged before instruction commit.
     if(_du_input->is_valid && !_nxt_regs.queue.full()) {
-      du_output.is_valid = true;
       _nxt_regs.queue.push(Entry{
         .is_ready = false,
         .is_br = _du_input->is_br,
@@ -86,6 +87,7 @@ public:
         .dst_reg = _du_input->dst_reg,
         .raw_instr = _du_input->raw_instr
       });
+      du_output.is_valid = true;
       du_output.rob_index = _nxt_regs.queue.back_index();
     }
     if(_data_input->entry.is_valid) {
@@ -103,6 +105,13 @@ public:
     }
     if(!_nxt_regs.queue.empty() && _nxt_regs.queue.front().is_ready) {
       auto record = _nxt_regs.queue.front();
+#ifdef ISM_DEBUG
+      std::cerr << std::hex << record.instr_addr << " : " << record.raw_instr << std::endl;
+#endif
+      if(record.raw_instr == 0x0ff00513) {
+        // terminate program. stop.
+        terminate = true;
+      }
       if(record.is_br || record.is_jalr) {
         // A branch/jalr instruction.
         // PRED interaction
@@ -126,8 +135,8 @@ public:
           rf_output.raw_instr = record.raw_instr;
           _nxt_regs.queue.pop();
         }
-      } else if(record.is_store) {
-        // A memory store instruction.
+      } else if(record.is_store || record.is_load) {
+        // A memory interaction instruction.
         // LSB interaction
         lsb_output.is_valid = true;
         lsb_output.rob_index = _nxt_regs.queue.front_index();
@@ -164,7 +173,11 @@ public:
       *_flush_output = flush_output;
       update_signal = true;
     }
+    debug("ROB update end");
     return update_signal;
+  }
+  bool to_terminate() const {
+    return terminate;
   }
 private:
   const std::shared_ptr<const WH_DU_ROB> _du_input;
@@ -175,6 +188,7 @@ private:
   const std::shared_ptr<WH_ROB_RF> _rf_output;
   const std::shared_ptr<WH_FLUSH_CDB> _flush_output;
   Registers _cur_regs, _nxt_regs;
+  bool terminate = false;
 };
 
 

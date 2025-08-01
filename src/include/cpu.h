@@ -141,9 +141,9 @@ public:
 
     _alu = std::make_shared<ALU>(
       wh_rs_alu,
+      wh_flush_cdb,
       wh_alu_cdb,
-      wh_alu_rs,
-      wh_flush_cdb
+      wh_alu_rs
     );
 
     _lsb = std::make_shared<LSB>(
@@ -210,17 +210,25 @@ public:
   }
   bool tick() {
     ++_clk;
+
+    debug("Clock cycle " + std::to_string(_clk) + ":");
     for(bool stabilized = false; !stabilized; ) {
+      debug("Try update-----------");
       stabilized = true;
       // You can even shuffle the modules here.
       // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
-      for(auto &module: _modules)
-        stabilized &= !module->update();
+      for(auto &module: _modules) {
+        bool res = module->update();
+        debug(res ? "Updated" : "Stable");
+        if(res) stabilized = false;
+      }
     }
     // You can even shuffle the modules here.
     // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
     for(auto &module: _modules)
       module->sync();
+    return !_rob->to_terminate();
+    debug("Clock cycle " + std::to_string(_clk) + "ends.");
   }
 
   mem_val_t get_reg(int i) const {

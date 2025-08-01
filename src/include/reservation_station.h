@@ -57,6 +57,7 @@ public:
   }
 
   bool update() override {
+    debug("RS update start");
     _nxt_regs = _cur_regs;
 
     WH_RS_ALU alu_output{};
@@ -94,13 +95,10 @@ public:
         Entry& entry = _nxt_regs.entries[i];
         if(entry.is_valid && entry.src1_ready && entry.src2_ready) {
           bool is_alu_or_branch_instr = !(entry.instr_type == InstrType::LB ||
-                                           entry.instr_type == InstrType::LH ||
-                                           entry.instr_type == InstrType::LW ||
-                                           entry.instr_type == InstrType::LBU ||
-                                           entry.instr_type == InstrType::LHU ||
-                                           entry.instr_type == InstrType::SB ||
-                                           entry.instr_type == InstrType::SH ||
-                                           entry.instr_type == InstrType::SW);
+          entry.instr_type == InstrType::LH || entry.instr_type == InstrType::LW ||
+          entry.instr_type == InstrType::LBU || entry.instr_type == InstrType::LHU ||
+          entry.instr_type == InstrType::SB || entry.instr_type == InstrType::SH ||
+          entry.instr_type == InstrType::SW);
 
           if(is_alu_or_branch_instr && entry.rob_index < earliest_rob_idx) {
             earliest_rob_idx = entry.rob_index;
@@ -126,12 +124,11 @@ public:
         .pred_pc = dispatched_entry.pred_pc
       };
 
-      dispatched_entry.is_valid = false; // Mark as invalid
+      dispatched_entry.is_valid = false;
       --_nxt_regs.size;
-      update_signal = true;
     }
 
-    // Attempt to find a free slot for new incoming instruction
+    // find a free slot for the incoming instruction
     std::size_t free_entry_idx = StnSize;
     if(_nxt_regs.size < StnSize) {
       for(std::size_t i = 0; i < StnSize; ++i) {
@@ -160,7 +157,6 @@ public:
           .pred_pc = _du_input->pred_pc
         };
         ++_nxt_regs.size;
-        update_signal = true;
     }
 
     du_output = WH_RS_DU{
@@ -177,6 +173,7 @@ public:
       update_signal = true;
     }
 
+    debug("RS update end");
     return update_signal;
   }
 

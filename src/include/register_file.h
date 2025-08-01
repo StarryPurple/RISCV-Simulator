@@ -22,9 +22,10 @@ public:
     _cur_regs[0] = 0; // fix x0 = 0
   }
   bool update() override {
+    debug("RF update start");
     _nxt_regs = _cur_regs;
 
-    WH_RF_DU du_output;
+    WH_RF_DU du_output{};
 
     if(_rob_input->is_valid) {
       _nxt_regs[_rob_input->dst_reg] = _rob_input->value;
@@ -44,6 +45,7 @@ public:
       *_du_output = du_output;
       update_signal = true;
     }
+    debug("RF update end");
     return update_signal;
   }
   mem_ptr_t get_reg(int i) const {

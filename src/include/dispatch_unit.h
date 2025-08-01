@@ -99,6 +99,7 @@ public:
   }
 
   bool update() override {
+    debug("DU update start");
     _nxt_regs = _cur_regs;
 
     WH_DU_IFU ifu_output{};
@@ -147,6 +148,7 @@ public:
         *_rob_output = rob_output;
         update_signal = true;
       }
+      debug("DU update end");
       return update_signal;
     }
 
@@ -166,33 +168,40 @@ public:
       } else {
         ifu_output.can_accept_req = true;
       }
-      update_signal = true;
     } break;
 
-    case State::FETCHED_DECODED: {
+    case State::FETCHED_DECODED:
+    case State::WAIT_ROB_ALLOC: {
+      rob_output = WH_DU_ROB{
+        .is_valid = true,
+        .raw_instr = _nxt_regs.instr.raw_instr(),
+        .is_br = _nxt_regs.instr.is_br(),
+        .is_jalr = _nxt_regs.instr.is_jalr(),
+        .instr_addr = _nxt_regs.instr_addr,
+        .pred_pc = (_nxt_regs.instr.is_br() || _nxt_regs.instr.is_jalr()) ?
+        (_nxt_regs.instr_addr + _nxt_regs.instr.imm()) : (_nxt_regs.instr_addr + 4),
+        .is_store = _nxt_regs.instr.is_store(),
+        .data_len = _nxt_regs.instr.mem_data_len(),
+        .write_rf = _nxt_regs.instr.write_rf(),
+        .dst_reg = _nxt_regs.instr.rd()
+      };
       rob_output.is_valid = true;
       rob_output.raw_instr = _nxt_regs.instr.raw_instr();
       _nxt_regs.rob_request_sent = true;
-      _nxt_regs.state = State::WAIT_ROB_ALLOC;
-      ifu_output.can_accept_req = false;
-      update_signal = true;
-    } break;
-
-    case State::WAIT_ROB_ALLOC: {
-      if(_rob_input->is_valid){
+      if(_rob_input->is_valid) {
         _nxt_regs.alloc_rob_index = _rob_input->rob_index;
         _nxt_regs.rob_entry_allocated_ack = true;
         _nxt_regs.state = State::ROB_ALLOCATED;
       } else {
-        rob_output.is_valid = true;
+        _nxt_regs.state = State::WAIT_ROB_ALLOC;
+        rob_output.is_valid = true; // ?
       }
       ifu_output.can_accept_req = false;
-      update_signal = true;
     } break;
 
     case State::ROB_ALLOCATED: {
       rf_index_t rs1_idx = _nxt_regs.instr.rs1();
-      if(rs1_idx == 0) {
+      if(!_nxt_regs.instr.has_src1() || rs1_idx == 0) {
         _nxt_regs.src1_ready = true;
         _nxt_regs.src1_value = 0;
         _nxt_regs.src1_index = 0;
@@ -209,12 +218,7 @@ public:
       }
 
       rf_index_t rs2_idx = _nxt_regs.instr.rs2();
-
-      if(!_nxt_regs.instr.has_src2()) {
-        _nxt_regs.src2_ready = true;
-        _nxt_regs.src2_value = _nxt_regs.instr.imm();
-        _nxt_regs.src2_index = 0;
-      } else if(rs2_idx == 0) {
+      if(!_nxt_regs.instr.has_src2() || rs2_idx == 0) {
         _nxt_regs.src2_ready = true;
         _nxt_regs.src2_value = 0;
         _nxt_regs.src2_index = 0;
@@ -231,7 +235,6 @@ public:
       }
       ifu_output.can_accept_req = false;
       _nxt_regs.state = State::WAIT_OPERANDS;
-      update_signal = true;
     } break;
 
     case State::WAIT_OPERANDS: {
@@ -261,7 +264,6 @@ public:
         _nxt_regs.state = State::OPERANDS_READY;
       }
       ifu_output.can_accept_req = false;
-      update_signal = true;
     } break;
 
     case State::OPERANDS_READY: {
@@ -307,14 +309,12 @@ public:
           ifu_output.can_accept_req = false;
         }
       }
-      update_signal = true;
     } break;
 
     case State::DISPATCHING: {
       _nxt_regs.state = State::IDLE;
       _nxt_regs.instr_valid = false;
       ifu_output.can_accept_req = true;
-      update_signal = true;
     } break;
 
     case State::STALLED: {
@@ -326,7 +326,6 @@ public:
         }
       }
       ifu_output.can_accept_req = false;
-      update_signal = true;
     } break;
     }
 
@@ -372,6 +371,7 @@ public:
       update_signal = true;
     }
 
+    debug("DU update end");
     return update_signal;
   }
 private:

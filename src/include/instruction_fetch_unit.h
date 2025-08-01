@@ -46,6 +46,7 @@ public:
     _cur_regs = _nxt_regs;
   }
   bool update() override {
+    debug("IFU update start");
     _nxt_stat = _cur_stat;
     _nxt_regs = _cur_regs;
 
@@ -74,7 +75,7 @@ public:
       } break;
       case State::FETCH_INSTR: {
         if(!_nxt_regs.is_fetching) {
-          // reply precessed. Do a new fetch.
+          // reply processed. Do a new fetch.
           _nxt_regs.pc += 4;
           try_process(miu_output, pred_output, du_output);
         }
@@ -111,6 +112,7 @@ public:
       *_du_output = du_output;
       update_signal = true;
     }
+    debug("IFU update end");
     return update_signal;
   }
 
@@ -156,7 +158,8 @@ private:
       } else {
         _nxt_stat = _cur_stat;
       }
-    } else if(!_nxt_regs.queue.full() && !_nxt_regs.is_fetching) {
+    }
+    if(!_nxt_regs.queue.full() && !_nxt_regs.is_fetching) {
       // fetch one
       miu_output.is_valid = true;
       miu_output.pc = _nxt_regs.pc;
