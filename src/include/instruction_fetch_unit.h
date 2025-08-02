@@ -81,7 +81,6 @@ public:
 
         if(instr.is_jal()) {
           _nxt_regs.pc = instr_addr + instr.imm();
-          _nxt_regs.queue.clear();
           _nxt_regs.is_fetching = false;
           _nxt_stat = State::IDLE;
         } else if(instr.is_jalr() || instr.is_br()) {
@@ -93,19 +92,16 @@ public:
           _nxt_stat = State::HANDLE_BR_JMP;
         } else {
           _nxt_regs.pc = instr_addr + 4;
+          _nxt_regs.is_fetching = false;
           _nxt_stat = State::IDLE;
         }
       }
-
-      if(_cur_stat == State::HANDLE_BR_JMP && _pred_input->is_valid) {
-        if(_pred_input->pred_pc != _nxt_regs.pc) {
-          _nxt_regs.pc = _pred_input->pred_pc;
-          _nxt_regs.queue.clear();
-          _nxt_regs.is_fetching = false;
-        }
+      if(_nxt_stat == State::HANDLE_BR_JMP && _pred_input->is_valid) {
+        _nxt_regs.pc = _pred_input->pred_pc;
+        _nxt_regs.is_fetching = false;
         _nxt_stat = State::IDLE;
       }
-      if(!_nxt_regs.is_fetching && !_nxt_regs.queue.full() && (
+      if(_nxt_stat == State::IDLE && !_nxt_regs.is_fetching && !_nxt_regs.queue.full() && (
         _nxt_regs.queue.empty() || _nxt_regs.queue.front().second != _nxt_regs.pc)) {
         miu_output.is_valid = true;
         miu_output.pc = _nxt_regs.pc;

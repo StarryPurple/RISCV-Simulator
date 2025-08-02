@@ -151,7 +151,9 @@ public:
 
     switch(_nxt_regs.state) {
     case State::IDLE: {
+      ifu_output.can_accept_req = true;
       if(_ifu_input->is_valid) {
+        // ifu_output.can_accept_req = false; // handle it first
         _nxt_regs.instr_valid = true;
         _nxt_regs.instr = Instruction(_ifu_input->raw_instr);
         _nxt_regs.instr_addr = _ifu_input->instr_addr;
@@ -161,7 +163,6 @@ public:
         _nxt_regs.is_load_store = _nxt_regs.instr.is_load() || _nxt_regs.instr.is_store();
         _nxt_regs.state = State::FETCHED_DECODED;
       }
-      ifu_output.can_accept_req = true;
     } break;
 
     case State::FETCHED_DECODED:
@@ -220,7 +221,6 @@ public:
           _nxt_regs.src2_index = _mapping_table[rs2_idx].rob_index;
           _nxt_regs.src2_value = 0;
         }
-        ifu_output.can_accept_req = false;
         _nxt_regs.state = State::WAIT_OPERANDS;
       } else {
         _nxt_regs.state = State::WAIT_ROB_ALLOC;
@@ -272,7 +272,6 @@ public:
         };
         _nxt_regs.dispatched = true;
         _nxt_regs.state = State::DISPATCHING;
-        ifu_output.can_accept_req = true;
       } else {
         if(_rs_input->can_accept_instr) {
           rs_output = WH_DU_RS{
@@ -293,10 +292,8 @@ public:
           };
           _nxt_regs.dispatched = true;
           _nxt_regs.state = State::DISPATCHING;
-          ifu_output.can_accept_req = true;
         } else {
           _nxt_regs.state = State::STALLED;
-          ifu_output.can_accept_req = false;
         }
       }
     } break;
@@ -315,7 +312,6 @@ public:
           _nxt_regs.state = State::OPERANDS_READY;
         }
       }
-      ifu_output.can_accept_req = false;
     } break;
     }
 
