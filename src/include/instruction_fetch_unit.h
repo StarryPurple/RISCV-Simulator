@@ -12,15 +12,13 @@ template <std::size_t BufSize>
 class InstructionFetchUnit : public CPUModule {
   enum class State {
     IDLE,
-    FETCH_INSTR,
     HANDLE_BR_JMP,
   };
   struct Registers {
     circular_queue<std::pair<raw_instr_t, mem_ptr_t>, BufSize> queue; // raw instructions
     mem_ptr_t pc; // managed here
-    bool is_fetching; // waiting for iFetch reply. do not try to send another request when waiting.
     // clock_t clk_delay;
-    Registers(mem_ptr_t _pc) : pc(_pc), is_fetching(false) {}
+    Registers(mem_ptr_t _pc) : pc(_pc) {}
   };
 
 public:
@@ -46,7 +44,7 @@ public:
     _cur_regs = _nxt_regs;
   }
   bool update() override {
-    debug("IFU");
+    // debug("IFU");
     _nxt_stat = _cur_stat;
     _nxt_regs = _cur_regs;
 
@@ -58,17 +56,14 @@ public:
     if(_flush_input->is_flush) {
       _nxt_regs.pc = _flush_input->pc;
       _nxt_regs.queue.clear();
-      _nxt_regs.is_fetching = false;
       // Then fetch new instr
       miu_output.is_valid = true;
       miu_output.pc = _nxt_regs.pc;
-      _nxt_regs.is_fetching = true;
-      _nxt_stat = State::FETCH_INSTR;
+      _nxt_stat = State::IDLE;
     } else {
       if(_miu_input->is_valid && !_nxt_regs.queue.full()) {
         // fetch instr reply has came.
         _nxt_regs.queue.emplace(_miu_input->instr, _miu_input->instr_addr);
-        _nxt_regs.is_fetching = false;
       }
 
       if(_du_input->can_accept_req && !_nxt_regs.queue.empty()) {
@@ -81,7 +76,6 @@ public:
 
         if(instr.is_jal()) {
           _nxt_regs.pc = instr_addr + instr.imm();
-          _nxt_regs.is_fetching = false;
           _nxt_stat = State::IDLE;
         } else if(instr.is_jalr() || instr.is_br()) {
           pred_output.is_valid = true;
@@ -92,21 +86,18 @@ public:
           _nxt_stat = State::HANDLE_BR_JMP;
         } else {
           _nxt_regs.pc = instr_addr + 4;
-          _nxt_regs.is_fetching = false;
           _nxt_stat = State::IDLE;
         }
       }
       if(_nxt_stat == State::HANDLE_BR_JMP && _pred_input->is_valid) {
         _nxt_regs.pc = _pred_input->pred_pc;
-        _nxt_regs.is_fetching = false;
         _nxt_stat = State::IDLE;
       }
-      if(_nxt_stat == State::IDLE && !_nxt_regs.is_fetching && !_nxt_regs.queue.full() && (
+      // send...
+      if(_nxt_stat == State::IDLE && !_nxt_regs.queue.full() && (
         _nxt_regs.queue.empty() || _nxt_regs.queue.front().second != _nxt_regs.pc)) {
         miu_output.is_valid = true;
         miu_output.pc = _nxt_regs.pc;
-        _nxt_regs.is_fetching = true;
-        _nxt_stat = State::FETCH_INSTR;
       }
     }
 

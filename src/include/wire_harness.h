@@ -196,7 +196,6 @@ struct WH_DU_RF {
 struct WH_DU_LSB {
   bool is_valid = false;
 
-  mem_ptr_t addr;
   mptr_diff_t data_len;
   bool is_load = false;
   bool is_store = false;

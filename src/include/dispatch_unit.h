@@ -45,9 +45,6 @@ class DispatchUnit : public CPUModule {
     bool rob_request_sent = false;
     bool rob_entry_allocated_ack = false;
     rob_index_t alloc_rob_index = 0;
-
-    bool dispatched = false;
-    bool is_load_store = false;
   };
 
   std::array<MappingTableEntry, RFSize> _mapping_table;
@@ -97,7 +94,7 @@ public:
   }
 
   bool update() override {
-    debug("DU");
+    // debug("DU");
     _nxt_regs = _cur_regs;
 
     WH_DU_IFU ifu_output{};
@@ -109,7 +106,6 @@ public:
     bool update_signal = false;
 
     _nxt_regs.rob_request_sent = false;
-    _nxt_regs.dispatched = false;
     _nxt_regs.rob_entry_allocated_ack = false;
 
     if(_flush_input->is_flush) {
@@ -117,7 +113,6 @@ public:
       _nxt_regs.instr_valid = false;
       _nxt_regs.rob_request_sent = false;
       _nxt_regs.rob_entry_allocated_ack = false;
-      _nxt_regs.dispatched = false;
 
       // Reset mapping table on flush
       for(std::size_t i = 0; i < RFSize; ++i){
@@ -159,8 +154,6 @@ public:
         _nxt_regs.instr_addr = _ifu_input->instr_addr;
 
         _nxt_regs.dst_reg = _nxt_regs.instr.rd();
-
-        _nxt_regs.is_load_store = _nxt_regs.instr.is_load() || _nxt_regs.instr.is_store();
         _nxt_regs.state = State::FETCHED_DECODED;
       }
     } break;
@@ -259,58 +252,50 @@ public:
     case State::OPERANDS_READY: {
       bool is_branch_instr = _nxt_regs.instr.is_br() || _nxt_regs.instr.is_jal() || _nxt_regs.instr.is_jalr();
 
-      if(_nxt_regs.is_load_store) {
-        lsb_output = WH_DU_LSB{
+      if(_rs_input->can_accept_instr) {
+        rs_output = WH_DU_RS{
           .is_valid = true,
-          .addr = _nxt_regs.src1_value + _nxt_regs.instr.imm(),
-          .data_len = _nxt_regs.instr.mem_data_len(),
-          .is_load = _nxt_regs.instr.is_load(),
-          .is_store = _nxt_regs.instr.is_store(),
-          .is_store_data_ready = true,
           .rob_index = _nxt_regs.alloc_rob_index,
-          .value = _nxt_regs.src2_value
+          .instr_type = _nxt_regs.instr.type(),
+          .src1_ready = _nxt_regs.src1_ready,
+          .src1_value = _nxt_regs.src1_value,
+          .src1_index = _nxt_regs.src1_index,
+          .src2_ready = _nxt_regs.src2_ready,
+          .src2_value = _nxt_regs.src2_value,
+          .src2_index = _nxt_regs.src2_index,
+          .imm = _nxt_regs.instr.imm(),
+          .dst_reg = _nxt_regs.dst_reg,
+          .instr_addr = _nxt_regs.instr_addr,
+          .is_branch = is_branch_instr,
+          .pred_pc = _nxt_regs.instr_addr + 4
         };
-        _nxt_regs.dispatched = true;
+        if(_nxt_regs.instr.is_load() || _nxt_regs.instr.is_store()) {
+          lsb_output = WH_DU_LSB{
+            .is_valid = true,
+            .data_len = _nxt_regs.instr.mem_data_len(),
+            .is_load = _nxt_regs.instr.is_load(),
+            .is_store = _nxt_regs.instr.is_store(),
+            .is_store_data_ready = _nxt_regs.src2_ready,
+            .rob_index = _nxt_regs.alloc_rob_index,
+            .value = _nxt_regs.src2_value
+          };
+        }
         _nxt_regs.state = State::DISPATCHING;
       } else {
-        if(_rs_input->can_accept_instr) {
-          rs_output = WH_DU_RS{
-            .is_valid = true,
-            .rob_index = _nxt_regs.alloc_rob_index,
-            .instr_type = _nxt_regs.instr.type(),
-            .src1_ready = _nxt_regs.src1_ready,
-            .src1_value = _nxt_regs.src1_value,
-            .src1_index = _nxt_regs.src1_index,
-            .src2_ready = _nxt_regs.src2_ready,
-            .src2_value = _nxt_regs.src2_value,
-            .src2_index = _nxt_regs.src2_index,
-            .imm = _nxt_regs.instr.imm(),
-            .dst_reg = _nxt_regs.dst_reg,
-            .instr_addr = _nxt_regs.instr_addr,
-            .is_branch = is_branch_instr,
-            .pred_pc = _nxt_regs.instr_addr + 4
-          };
-          _nxt_regs.dispatched = true;
-          _nxt_regs.state = State::DISPATCHING;
-        } else {
-          _nxt_regs.state = State::STALLED;
-        }
+        _nxt_regs.state = State::STALLED;
       }
-    } break;
+    }
+    break;
 
     case State::DISPATCHING: {
       _nxt_regs.state = State::IDLE;
       _nxt_regs.instr_valid = false;
-      ifu_output.can_accept_req = true;
+      ifu_output.can_accept_req = false; // nah, no.
     } break;
 
     case State::STALLED: {
-      if(_nxt_regs.is_load_store) {
+      if(_rs_input->can_accept_instr) {
         _nxt_regs.state = State::OPERANDS_READY;
-      } else {
-        if(_rs_input->can_accept_instr) {
-          _nxt_regs.state = State::OPERANDS_READY;
-        }
       }
     } break;
     }
@@ -320,38 +305,21 @@ public:
       update_signal = true;
     }
 
-    if(_nxt_regs.dispatched && !_nxt_regs.is_load_store) {
-      if(*_rs_output != rs_output) {
-        *_rs_output = rs_output;
-        update_signal = true;
-      }
-    } else {
-      if(_cur_regs.dispatched && !_cur_regs.is_load_store) {
-        if(*_rs_output != WH_DU_RS{}) {
-          *_rs_output = WH_DU_RS{};
-          update_signal = true;
-        }
-      }
+    if(*_rs_output != rs_output) {
+      *_rs_output = rs_output;
+      update_signal = true;
     }
 
-    if(_nxt_regs.dispatched && _nxt_regs.is_load_store) {
-      if(*_lsb_output != lsb_output) {
-        *_lsb_output = lsb_output;
-        update_signal = true;
-      }
-    } else {
-      if(_cur_regs.dispatched && _cur_regs.is_load_store) {
-        if(*_lsb_output != WH_DU_LSB{}) {
-          *_lsb_output = WH_DU_LSB{};
-          update_signal = true;
-        }
-      }
+    if(*_lsb_output != lsb_output) {
+      *_lsb_output = lsb_output;
+      update_signal = true;
     }
 
     if(*_rf_output != rf_output) {
       *_rf_output = rf_output;
       update_signal = true;
     }
+
     if(*_rob_output != rob_output) {
       *_rob_output = rob_output;
       update_signal = true;

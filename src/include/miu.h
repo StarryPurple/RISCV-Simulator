@@ -37,7 +37,7 @@ public:
     _cur_regs = _nxt_regs;
   }
   bool update() override {
-    debug("MIU");
+    // debug("MIU");
     _nxt_stat = _cur_stat;
     _nxt_regs = _cur_regs;
 

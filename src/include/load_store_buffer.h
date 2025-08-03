@@ -59,7 +59,7 @@ class LoadStoreBuffer : public CPUModule {
     }
 
     bool update() override {
-      debug("LSB");
+      // debug("LSB");
       _nxt_regs = _cur_regs;
 
       WH_LSB_MIU miu_output{};
@@ -100,14 +100,14 @@ class LoadStoreBuffer : public CPUModule {
 
       if(_du_input->is_valid) {
         if(!_nxt_regs.entries.full()) {
-          Entry entry{};
-          entry.is_valid = true;
-          entry.rob_index = _du_input->rob_index;
-          entry.is_load = _du_input->is_load;
-          entry.is_store = _du_input->is_store;
-          entry.addr = _du_input->addr;
-          entry.is_addr_ready = true;
-          entry.data_len = _du_input->data_len;
+          debug("LSB: " + std::to_string(_du_input->rob_index));
+          Entry entry{
+            .is_valid = true,
+            .is_load = _du_input->is_load,
+            .is_store = _du_input->is_store,
+            .rob_index = _du_input->rob_index,
+            .data_len = _du_input->data_len,
+          };
 
           if(entry.is_store) {
             entry.data = _du_input->value;
@@ -123,9 +123,9 @@ class LoadStoreBuffer : public CPUModule {
       for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
         auto &entry = _nxt_regs.entries.at(_nxt_regs.entries.front_index() + i);
         if(entry.is_valid && entry.rob_index == _data_input->entry.rob_index &&
-           entry.is_store && !entry.is_data_ready) {
-          entry.data = _data_input->entry.value;
-          entry.is_data_ready = true;
+           entry.is_store && !entry.is_addr_ready) {
+          entry.addr = _data_input->entry.value;
+          entry.is_addr_ready = true;
           entry.is_executed = true;
           break;
         }

@@ -55,7 +55,7 @@ public:
     _cur_regs = _nxt_regs;
   }
   bool update() override {
-    debug("ROB");
+    // debug("ROB");
     _nxt_regs = _cur_regs;
 
     WH_ROB_LSB lsb_output{};

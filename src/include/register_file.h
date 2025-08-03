@@ -30,7 +30,7 @@ public:
     _cur_regs.arr[0] = 0; // fix x0 = 0
   }
   bool update() override {
-    debug("RF");
+    // debug("RF");
     _nxt_regs = _cur_regs;
     _nxt_stat = _cur_stat;
 

@@ -40,7 +40,7 @@ public:
     _cur_stat = _nxt_stat;
   }
   bool update() override {
-    debug("PRED");
+    // debug("PRED");
     _nxt_regs = _cur_regs;
     _nxt_stat = _cur_stat;
 

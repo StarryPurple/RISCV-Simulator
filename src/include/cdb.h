@@ -18,7 +18,7 @@ public:
   _output(std::move(output)) {}
   void sync() override {}
   bool update() override {
-    debug("CDB");
+    // debug("CDB");
     WH_CDB_OUT output{};
     // lsb first. alu second.
     if(_lsb_input->entry.is_valid) {

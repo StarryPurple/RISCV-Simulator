@@ -57,7 +57,7 @@ public:
   }
 
   bool update() override {
-    debug("RS");
+    // debug("RS");
     _nxt_regs = _cur_regs;
 
     WH_RS_ALU alu_output{};
@@ -94,13 +94,7 @@ public:
       for(std::size_t i = 0; i < StnSize; ++i) {
         Entry& entry = _nxt_regs.entries[i];
         if(entry.is_valid && entry.src1_ready && entry.src2_ready) {
-          bool is_alu_or_branch_instr = !(entry.instr_type == InstrType::LB ||
-          entry.instr_type == InstrType::LH || entry.instr_type == InstrType::LW ||
-          entry.instr_type == InstrType::LBU || entry.instr_type == InstrType::LHU ||
-          entry.instr_type == InstrType::SB || entry.instr_type == InstrType::SH ||
-          entry.instr_type == InstrType::SW);
-
-          if(is_alu_or_branch_instr && entry.rob_index < earliest_rob_idx) {
+          if(entry.rob_index < earliest_rob_idx) {
             earliest_rob_idx = entry.rob_index;
             dispatch_idx = i;
           }

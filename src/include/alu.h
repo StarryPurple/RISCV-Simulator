@@ -42,7 +42,7 @@ public:
   }
 
   bool update() override {
-    debug("ALU");
+    // debug("ALU");
     _nxt_regs = _cur_regs;
 
     WH_ALU_CDB cdb_output{};
@@ -191,8 +191,20 @@ public:
         real_branch_pc = (_nxt_regs.src1_value + _nxt_regs.imm) & ~1;
         result = _nxt_regs.instr_addr + 4;
         break;
-      default:
+      case InstrType::LB:
+      case InstrType::LH:
+      case InstrType::LW:
+      case InstrType::LBU:
+      case InstrType::LHU:
+      case InstrType::SB:
+      case InstrType::SH:
+      case InstrType::SW:
+        result = _nxt_regs.src1_value + _nxt_regs.imm;
         break;
+      case InstrType::INVALID:
+        break;
+      default:
+        throw std::runtime_error("Unrecognized instr type");
       }
 
       cdb_output.entry = CDBEntry{

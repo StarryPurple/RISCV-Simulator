@@ -219,7 +219,7 @@ public:
       // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
       for(auto &module: _modules) {
         bool res = module->update();
-        debug(res ? "Updated" : "Not updated");
+        // debug(res ? "Updated" : "Not updated");
         if(res) stabilized = false;
       }
     }
