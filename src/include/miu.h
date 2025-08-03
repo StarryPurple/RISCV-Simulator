@@ -68,10 +68,10 @@ public:
     case State::IFU_FETCH: {
       if(--_nxt_regs.clk_delay == 0) {
         ifu_output.is_valid = true;
-        ifu_output.instr = static_cast<raw_instr_t>(
+        ifu_output.raw_instr = static_cast<raw_instr_t>(
           read_mem(_cur_regs.addr, _cur_regs.data_len));
         ifu_output.instr_addr = _cur_regs.addr;
-        debug("Load instr: " + std::to_string(ifu_output.instr) + " with data len " + std::to_string(_cur_regs.data_len)
+        debug("Load instr: " + std::to_string(ifu_output.raw_instr) + " with data len " + std::to_string(_cur_regs.data_len)
         + " at address " + std::to_string(_cur_regs.addr));
         try_process();
       }

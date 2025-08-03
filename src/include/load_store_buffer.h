@@ -43,7 +43,7 @@ class LoadStoreBuffer : public CPUModule {
       std::shared_ptr<const WH_MIU_LSB> miu_input,
       std::shared_ptr<const WH_DU_LSB> du_input,
       std::shared_ptr<const WH_ROB_LSB> rob_input,
-      std::shared_ptr<const WH_FLUSH_CDB> flush_input,
+      std::shared_ptr<const WH_FLUSH_PIPELINE> flush_input,
       std::shared_ptr<const WH_CDB_OUT> data_input,
       std::shared_ptr<WH_LSB_MIU> miu_output,
       std::shared_ptr<WH_LSB_CDB> data_output
@@ -71,15 +71,19 @@ class LoadStoreBuffer : public CPUModule {
 
       if(_flush_input->is_flush) {
         _nxt_regs.entries.clear();
-        update_signal = true;
+
+        update_signal = false;
+
         if(*_miu_output != miu_output) {
           *_miu_output = miu_output;
           update_signal = true;
         }
+
         if(*_data_output != data_output) {
           *_data_output = data_output;
           update_signal = true;
         }
+
         return update_signal;
       }
 
@@ -210,7 +214,7 @@ class LoadStoreBuffer : public CPUModule {
     const std::shared_ptr<const WH_MIU_LSB> _miu_input;
     const std::shared_ptr<const WH_DU_LSB> _du_input;
     const std::shared_ptr<const WH_ROB_LSB> _rob_input;
-    const std::shared_ptr<const WH_FLUSH_CDB> _flush_input;
+    const std::shared_ptr<const WH_FLUSH_PIPELINE> _flush_input;
     const std::shared_ptr<const WH_CDB_OUT> _data_input;
 
     const std::shared_ptr<WH_LSB_MIU> _miu_output;

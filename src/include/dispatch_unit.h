@@ -32,6 +32,8 @@ class DispatchUnit : public CPUModule {
     Instruction instr;
     mem_ptr_t instr_addr;
 
+    mem_ptr_t next_pc;
+
     bool src1_ready = false;
     mem_val_t src1_value = 0;
     rob_index_t src1_index = 0;
@@ -55,7 +57,7 @@ public:
     std::shared_ptr<const WH_RF_DU> rf_input,
     std::shared_ptr<const WH_ROB_DU> rob_input,
     std::shared_ptr<const WH_CDB_OUT> cdb_input,
-    std::shared_ptr<const WH_FLUSH_CDB> flush_input,
+    std::shared_ptr<const WH_FLUSH_PIPELINE> flush_input,
     std::shared_ptr<const WH_RS_DU> rs_input,
     std::shared_ptr<WH_DU_IFU> ifu_output,
     std::shared_ptr<WH_DU_RS> rs_output,
@@ -116,7 +118,7 @@ public:
 
       // Reset mapping table on flush
       for(std::size_t i = 0; i < RFSize; ++i){
-        _mapping_table[i] = MappingTableEntry{};
+        _mapping_table[i].is_ready = true;
       }
 
       ifu_output.can_accept_req = true;
@@ -152,6 +154,7 @@ public:
         _nxt_regs.instr_valid = true;
         _nxt_regs.instr = Instruction(_ifu_input->raw_instr);
         _nxt_regs.instr_addr = _ifu_input->instr_addr;
+        _nxt_regs.next_pc = _ifu_input->pred_pc;
 
         _nxt_regs.dst_reg = _nxt_regs.instr.rd();
         _nxt_regs.state = State::FETCHED_DECODED;
@@ -166,15 +169,12 @@ public:
         .is_br = _nxt_regs.instr.is_br(),
         .is_jalr = _nxt_regs.instr.is_jalr(),
         .instr_addr = _nxt_regs.instr_addr,
-        .pred_pc = (_nxt_regs.instr.is_br() || _nxt_regs.instr.is_jalr()) ?
-        (_nxt_regs.instr_addr + _nxt_regs.instr.imm()) : (_nxt_regs.instr_addr + 4),
+        .pred_pc = _nxt_regs.next_pc,
         .is_store = _nxt_regs.instr.is_store(),
         .data_len = _nxt_regs.instr.mem_data_len(),
         .write_rf = _nxt_regs.instr.write_rf(),
         .dst_reg = _nxt_regs.instr.rd()
       };
-      rob_output.is_valid = true;
-      rob_output.raw_instr = _nxt_regs.instr.raw_instr();
       _nxt_regs.rob_request_sent = true;
       if(_rob_input->is_alloc_valid) {
         _nxt_regs.alloc_rob_index = _rob_input->rob_index;
@@ -332,7 +332,7 @@ private:
   const std::shared_ptr<const WH_RF_DU> _rf_input;
   const std::shared_ptr<const WH_ROB_DU> _rob_input;
   const std::shared_ptr<const WH_CDB_OUT> _cdb_input;
-  const std::shared_ptr<const WH_FLUSH_CDB> _flush_input;
+  const std::shared_ptr<const WH_FLUSH_PIPELINE> _flush_input;
   const std::shared_ptr<const WH_RS_DU> _rs_input;
 
   const std::shared_ptr<WH_DU_IFU> _ifu_output;

@@ -39,7 +39,7 @@ public:
   ReservationStation(
     std::shared_ptr<const WH_DU_RS> du_input,
     std::shared_ptr<const WH_CDB_OUT> cdb_input,
-    std::shared_ptr<const WH_FLUSH_CDB> flush_input,
+    std::shared_ptr<const WH_FLUSH_PIPELINE> flush_input,
     std::shared_ptr<const WH_ALU_RS> alu_input,
     std::shared_ptr<WH_RS_ALU> alu_output,
     std::shared_ptr<WH_RS_DU> rs_output_for_du
@@ -70,6 +70,18 @@ public:
         _nxt_regs.entries[i].is_valid = false;
       }
       _nxt_regs.size = 0;
+
+      if(*_du_output != du_output) {
+        *_du_output = du_output;
+        update_signal = true;
+      }
+
+      if(*_alu_output != alu_output) {
+        *_alu_output = alu_output;
+        update_signal = true;
+      }
+
+      return update_signal;
     }
 
     if(_cdb_input->entry.is_valid) {
@@ -173,7 +185,7 @@ public:
 private:
   const std::shared_ptr<const WH_DU_RS> _du_input;
   const std::shared_ptr<const WH_CDB_OUT> _cdb_input;
-  const std::shared_ptr<const WH_FLUSH_CDB> _flush_input;
+  const std::shared_ptr<const WH_FLUSH_PIPELINE> _flush_input;
   const std::shared_ptr<const WH_ALU_RS> _alu_input;
 
   const std::shared_ptr<WH_RS_ALU> _alu_output;

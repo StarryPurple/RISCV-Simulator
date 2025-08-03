@@ -20,7 +20,7 @@ namespace insomnia {
 // load raw instruction
 struct WH_MIU_IFU {
   bool is_valid = false;
-  raw_instr_t instr{};
+  raw_instr_t raw_instr{};
   mem_ptr_t instr_addr;
   auto operator<=>(const WH_MIU_IFU &) const = default;
 };
@@ -53,6 +53,7 @@ struct WH_IFU_DU {
   bool is_valid = false;
   raw_instr_t raw_instr;
   mem_ptr_t instr_addr;
+  mem_ptr_t pred_pc;
   auto operator<=>(const WH_IFU_DU &) const = default;
 };
 
@@ -169,11 +170,11 @@ struct WH_ALU_CDB {
 
 // broadcaster: ROB
 // listener: IFU, DU, LSB, RS
-struct WH_FLUSH_CDB {
+struct WH_FLUSH_PIPELINE {
   bool is_flush = false;
   mem_ptr_t pc; // ifu will need it.
 
-  auto operator<=>(const WH_FLUSH_CDB &) const = default;
+  auto operator<=>(const WH_FLUSH_PIPELINE &) const = default;
 };
 
 struct WH_RF_DU {

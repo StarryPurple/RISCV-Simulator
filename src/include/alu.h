@@ -27,7 +27,7 @@ class CommonALU : public CPUModule {
 public:
   CommonALU(
     std::shared_ptr<const WH_RS_ALU> rs_input,
-    std::shared_ptr<const WH_FLUSH_CDB> flush_input,
+    std::shared_ptr<const WH_FLUSH_PIPELINE> flush_input,
     std::shared_ptr<WH_ALU_CDB> cdb_output,
     std::shared_ptr<WH_ALU_RS> rs_output
     ) :
@@ -241,7 +241,7 @@ private:
   const std::shared_ptr<const WH_RS_ALU> _rs_input;
   const std::shared_ptr<WH_ALU_CDB> _cdb_output;
   const std::shared_ptr<WH_ALU_RS> _rs_output;
-  const std::shared_ptr<const WH_FLUSH_CDB> _flush_input;
+  const std::shared_ptr<const WH_FLUSH_PIPELINE> _flush_input;
 
   Registers _cur_regs, _nxt_regs;
 };

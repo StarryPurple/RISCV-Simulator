@@ -69,7 +69,7 @@ public:
     auto wh_cdb_out   = std::make_shared<WH_CDB_OUT>();
     auto wh_lsb_cdb   = std::make_shared<WH_LSB_CDB>();
     auto wh_alu_cdb   = std::make_shared<WH_ALU_CDB>();
-    auto wh_flush_cdb = std::make_shared<WH_FLUSH_CDB>();
+    auto wh_flush     = std::make_shared<WH_FLUSH_PIPELINE>();
     auto wh_rf_du     = std::make_shared<WH_RF_DU>();
     auto wh_du_rf     = std::make_shared<WH_DU_RF>();
     auto wh_du_lsb    = std::make_shared<WH_DU_LSB>();
@@ -111,14 +111,14 @@ public:
       wh_rob_du,
       wh_rob_pred,
       wh_rob_rf,
-      wh_flush_cdb
+      wh_flush
     );
 
     _ifu = std::make_shared<IFU>(
       _pc,
       wh_miu_ifu,
       wh_pred_ifu,
-      wh_flush_cdb,
+      wh_flush,
       wh_du_ifu,
       wh_ifu_miu,
       wh_ifu_pred,
@@ -130,7 +130,7 @@ public:
       wh_rf_du,
       wh_rob_du,
       wh_cdb_out,
-      wh_flush_cdb,
+      wh_flush,
       wh_rs_du,
       wh_du_ifu,
       wh_du_rs,
@@ -141,7 +141,7 @@ public:
 
     _alu = std::make_shared<ALU>(
       wh_rs_alu,
-      wh_flush_cdb,
+      wh_flush,
       wh_alu_cdb,
       wh_alu_rs
     );
@@ -150,7 +150,7 @@ public:
       wh_miu_lsb,
       wh_du_lsb,
       wh_rob_lsb,
-      wh_flush_cdb,
+      wh_flush,
       wh_cdb_out,
       wh_lsb_miu,
       wh_lsb_cdb
@@ -159,7 +159,7 @@ public:
     _rs = std::make_shared<RS>(
       wh_du_rs,
       wh_cdb_out,
-      wh_flush_cdb,
+      wh_flush,
       wh_alu_rs,
       wh_rs_alu,
       wh_rs_du
@@ -219,7 +219,7 @@ public:
       // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
       for(auto &module: _modules) {
         bool res = module->update();
-        // debug(res ? "Updated" : "Not updated");
+        debug(res ? "Updated" : "Not updated");
         if(res) stabilized = false;
       }
     }

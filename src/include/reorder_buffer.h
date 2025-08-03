@@ -9,6 +9,10 @@ namespace insomnia {
 
 template <std::size_t BufSize>
 class ReorderBuffer : public CPUModule {
+  enum class State {
+    IDLE,
+    FLUSHING
+  };
   struct Entry {
     bool is_ready = false; // whether the result is valid
 
@@ -35,6 +39,7 @@ class ReorderBuffer : public CPUModule {
   };
   struct Registers {
     circular_queue<Entry, BufSize> queue; // entries
+    mem_ptr_t flush_pc;
   };
 public:
   ReorderBuffer(
@@ -44,25 +49,57 @@ public:
     std::shared_ptr<WH_ROB_DU> du_output,
     std::shared_ptr<WH_ROB_PRED> pred_output,
     std::shared_ptr<WH_ROB_RF> rf_output,
-    std::shared_ptr<WH_FLUSH_CDB> flush_output
+    std::shared_ptr<WH_FLUSH_PIPELINE> flush_output
     ) :
   _du_input(std::move(du_input)), _data_input(std::move(data_input)),
   _lsb_output(std::move(lsb_output)), _du_output(std::move(du_output)),
   _pred_output(std::move(pred_output)), _rf_output(std::move(rf_output)),
   _flush_output(std::move(flush_output)),
-  _cur_regs(), _nxt_regs() {}
+  _cur_regs(), _nxt_regs(), _cur_stat(State::IDLE), _nxt_stat(State::IDLE) {}
   void sync() override {
     _cur_regs = _nxt_regs;
+    _cur_stat = _nxt_stat;
   }
   bool update() override {
     // debug("ROB");
     _nxt_regs = _cur_regs;
+    _nxt_stat = _cur_stat;
 
     WH_ROB_LSB lsb_output{};
     WH_ROB_DU du_output{};
     WH_ROB_PRED pred_output{};
     WH_ROB_RF rf_output{};
-    WH_FLUSH_CDB flush_output{};
+    WH_FLUSH_PIPELINE flush_output{};
+
+    if(_cur_stat == State::FLUSHING) {
+      flush_output.is_flush = true;
+      flush_output.pc = _cur_regs.flush_pc;
+      _nxt_regs.queue.clear();
+      _nxt_stat = State::IDLE;
+
+      bool update_signal = false;
+      if(*_lsb_output != lsb_output) {
+        *_lsb_output = lsb_output;
+        update_signal = true;
+      }
+      if(*_du_output != du_output) {
+        *_du_output = du_output;
+        update_signal = true;
+      }
+      if(*_pred_output != pred_output) {
+        *_pred_output = pred_output;
+        update_signal = true;
+      }
+      if(*_rf_output != rf_output) {
+        *_rf_output = rf_output;
+        update_signal = true;
+      }
+      if(*_flush_output != flush_output) {
+        *_flush_output = flush_output;
+        update_signal = true;
+      }
+      return update_signal;
+    }
 
     // assign new slots: DU
     // listen and accept execution results: CDB
@@ -119,9 +156,8 @@ public:
         pred_output.is_pred_taken = (record.pred_pc == record.real_pc);
         if(record.pred_pc != record.real_pc) {
           // Prediction failed. Broadcast flushing signal and clear everything.
-          flush_output.is_flush = true;
-          flush_output.pc = record.real_pc;
-          _nxt_regs.queue.clear();
+          _nxt_regs.flush_pc = record.real_pc;
+          _nxt_stat = State::FLUSHING;
         } else if(record.write_rf) {
           // Prediction succeeded & instruction is jalr/need to write RF.
           // write x[rd] = val.
@@ -144,8 +180,7 @@ public:
         rf_output.value = record.rf_value;
         rf_output.raw_instr = record.raw_instr;
       }
-      if(!_nxt_regs.queue.empty()) // no flushed
-        _nxt_regs.queue.pop();
+      _nxt_regs.queue.pop(); // also popping the one with flush pc... This design can be changed.
     }
 
     bool update_signal = false;
@@ -181,8 +216,9 @@ private:
   const std::shared_ptr<WH_ROB_DU> _du_output;
   const std::shared_ptr<WH_ROB_PRED> _pred_output;
   const std::shared_ptr<WH_ROB_RF> _rf_output;
-  const std::shared_ptr<WH_FLUSH_CDB> _flush_output;
+  const std::shared_ptr<WH_FLUSH_PIPELINE> _flush_output;
   Registers _cur_regs, _nxt_regs;
+  State _cur_stat, _nxt_stat;
   bool terminate = false;
 };
 
