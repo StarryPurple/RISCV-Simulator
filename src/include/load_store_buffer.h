@@ -37,9 +37,11 @@ class LoadStoreBuffer : public CPUModule {
 
     bool load_sent = false;
     bool store_sent = false;
+    bool to_inform = false;
 
-    rob_index_t load_index;
-    rob_index_t store_index;
+    std::size_t load_index;
+    std::size_t store_index;
+    std::size_t inform_index;
   };
 
 public:
@@ -71,7 +73,7 @@ public:
     _nxt_regs.load_sent = false;
     _nxt_regs.store_sent = false;
 
-
+    // flush
     if(_flush_input->is_flush) {
       _nxt_regs.entries.clear();
 
@@ -111,21 +113,21 @@ public:
     // data load reply
     if(_miu_input->is_load_reply) {
       auto &entry = _nxt_regs.entries.at(_cur_regs.load_index);
-      assert(entry.is_valid && entry.is_load && !entry.is_data_ready);
+      assert(entry.is_valid && entry.is_load && !entry.data_ready);
 
       entry.data_value = _miu_input->value;
       entry.data_ready = true;
       entry.is_executed = true;
 
+      data_output.entry = CDBEntry{
+        .is_valid = true,
+        .rob_index = entry.rob_index,
+        .value = entry.data_value,
+      };
+
       _nxt_regs.load_sent = false;
     }
 
-    // data store reply
-    if(_miu_input->is_store_reply) {
-      auto &entry = _nxt_regs.entries.at(_cur_regs.store_index);
-      entry.is_executed = true;
-      _nxt_regs.store_sent = false;
-    }
 
     // cdb data broadcast (store_data_value/addr_value)
     if(_data_input->entry.is_valid) {
@@ -138,8 +140,8 @@ public:
           entry.data_value = _data_input->entry.value;
         }
         // l/s addr value (signal: rob_index, from_alu)
-        // ... but it cannot come from lsb itself.
-        if(!entry.addr_ready && entry.rob_index == _data_input->entry.rob_index) {
+        // from_alu is used in filtering the signal called by itself.
+        if(!entry.addr_ready && entry.rob_index == _data_input->entry.rob_index && _data_input->from_alu) {
           entry.addr_ready = true;
           entry.addr_value = _data_input->entry.value;
         }
@@ -150,9 +152,11 @@ public:
     if(_rob_input->is_valid) {
       for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
         auto &entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + i) % BufSize);
-        assert(entry.is_valid);
         if(entry.rob_index == _rob_input->rob_index) {
           entry.is_committed = true;
+          if(entry.is_load) {
+            entry.is_finished = true;
+          }
           break;
         }
       }
@@ -162,16 +166,15 @@ public:
     for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
       auto &entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + i) % BufSize);
       assert(entry.is_valid);
-      if(entry.is_load && !entry.is_data_ready) {
+      if(entry.is_load && !entry.data_ready) {
         bool has_reliance = false;
         for(std::size_t j = i; j > 0; --j) {
           auto& older_entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + j - 1) % BufSize);
-          if(older_entry.is_valid && older_entry.is_store &&
-             older_entry.addr == entry.addr) {
+          if(older_entry.is_valid && older_entry.is_store && older_entry.addr_value == entry.addr_value) {
             has_reliance = true;
             if(older_entry.data_ready && older_entry.data_len == entry.data_len) {
               entry.data_value = older_entry.data_value;
-              entry.is_data_ready = true;
+              entry.data_ready = true;
               entry.is_executed = true;
               data_output.entry = CDBEntry{
                 .is_valid = true,
@@ -199,10 +202,26 @@ public:
       }
     }
 
+    // inform ROB
+    for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
+      auto &entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + i) % BufSize);
+      if(entry.is_store && !entry.is_executed && entry.addr_ready && entry.data_ready) {
+        // using CDB to inform ROB
+        _nxt_regs.to_inform = true;
+        _nxt_regs.inform_index = entry.rob_index;
+        data_output.entry = CDBEntry{
+          .is_valid = true,
+          .rob_index = entry.rob_index,
+          .value = 0, // it doesn't matter.
+        };
+        // since the lsb has the higher priority, no need to worry about losing packages.
+        entry.is_executed = true;
+      }
+    }
     // execute committed store
     if(!_nxt_regs.entries.empty()) {
       auto &entry = _nxt_regs.entries.front();
-      if(entry.is_store && !entry.is_executed && entry.is_committed && !entry.is_finished) {
+      if(entry.is_store && entry.is_executed && entry.is_committed) {
         if(!_cur_regs.store_sent) {
           miu_output = WH_LSB_MIU{
             .is_store_request = true,
@@ -210,21 +229,22 @@ public:
             .value = entry.data_value,
             .data_len = entry.data_len
           };
-          data_output.entry = CDBEntry{
-            .is_valid = true,
-            .rob_index = entry.rob_index
-          };
-          entry.is_finished = true;
+          // inform MIU
           _nxt_regs.store_sent = true;
           _nxt_regs.store_index = _nxt_regs.entries.front_index();
         }
       }
     }
 
+    if(_miu_input->is_store_reply) {
+      auto &entry = _nxt_regs.entries.at(_nxt_regs.store_index);
+      entry.is_finished = true;
+      _nxt_regs.store_sent = false;
+    }
 
     while(_nxt_regs.entries.size() > 0) {
       auto &entry = _nxt_regs.entries.front();
-      if(entry.is_committed && entry.is_finished) {
+      if(entry.is_finished) {
         _nxt_regs.entries.pop();
       } else break;
     }

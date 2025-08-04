@@ -129,15 +129,17 @@ public:
     }
     if(_data_input->entry.is_valid && _nxt_regs.queue.index_valid(_data_input->entry.rob_index)) {
       auto &record = _nxt_regs.queue.at(_data_input->entry.rob_index);
-      record.is_ready = true;
-      if(record.is_br || record.is_jalr) {
-        record.real_pc = _data_input->entry.real_pc;
-      }
-      if(record.is_store) {
-        record.store_value = _data_input->entry.value;
-      }
-      if(record.write_rf) {
-        record.rf_value = _data_input->entry.value;
+      if((record.is_load || record.is_store) && _data_input->from_alu) {
+        // passing addr. ignore it.
+        debug("Passing L/S target addr: instr addr " + std::to_string(record.instr_addr));
+      } else {
+        record.is_ready = true;
+        if(record.is_br || record.is_jalr) {
+          record.real_pc = _data_input->entry.real_pc;
+        }
+        if(record.write_rf) {
+          record.rf_value = _data_input->entry.value;
+        }
       }
     }
     if(!_nxt_regs.queue.empty() && _nxt_regs.queue.front().is_ready) {
