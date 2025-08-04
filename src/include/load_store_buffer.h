@@ -37,11 +37,9 @@ class LoadStoreBuffer : public CPUModule {
 
     bool load_sent = false;
     bool store_sent = false;
-    bool to_inform = false;
 
     std::size_t load_index;
     std::size_t store_index;
-    std::size_t inform_index;
   };
 
 public:
@@ -51,12 +49,13 @@ public:
     std::shared_ptr<const WH_ROB_LSB> rob_input,
     std::shared_ptr<const WH_FLUSH_PIPELINE> flush_input,
     std::shared_ptr<const WH_CDB_OUT> data_input,
+    std::shared_ptr<WH_LSB_ROB> rob_output,
     std::shared_ptr<WH_LSB_MIU> miu_output,
     std::shared_ptr<WH_LSB_CDB> data_output
   ) :
     _miu_input(std::move(miu_input)), _du_input(std::move(du_input)),
     _rob_input(std::move(rob_input)), _flush_input(std::move(flush_input)),
-    _data_input(std::move(data_input)),
+    _data_input(std::move(data_input)), _rob_output(std::move(rob_output)),
     _miu_output(std::move(miu_output)), _data_output(std::move(data_output)),
     _cur_regs(), _nxt_regs() {}
 
@@ -68,6 +67,7 @@ public:
     // debug("LSB");
     _nxt_regs = _cur_regs;
 
+    WH_LSB_ROB rob_output{};
     WH_LSB_MIU miu_output{};
     WH_LSB_CDB data_output{};
     _nxt_regs.load_sent = false;
@@ -78,6 +78,11 @@ public:
       _nxt_regs.entries.clear();
 
       bool update_signal = false;
+
+      if(*_rob_output != rob_output) {
+        *_rob_output = rob_output;
+        update_signal = true;
+      }
 
       if(*_miu_output != miu_output) {
         *_miu_output = miu_output;
@@ -206,18 +211,13 @@ public:
     for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
       auto &entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + i) % BufSize);
       if(entry.is_store && !entry.is_executed && entry.addr_ready && entry.data_ready) {
-        // using CDB to inform ROB
-        _nxt_regs.to_inform = true;
-        _nxt_regs.inform_index = entry.rob_index;
-        data_output.entry = CDBEntry{
-          .is_valid = true,
-          .rob_index = entry.rob_index,
-          .value = 0, // it doesn't matter.
-        };
-        // since the lsb has the higher priority, no need to worry about losing packages.
         entry.is_executed = true;
+        rob_output.is_valid = true;
+        rob_output.rob_index = entry.rob_index;
+        break; // only notify one
       }
     }
+
     // execute committed store
     if(!_nxt_regs.entries.empty()) {
       auto &entry = _nxt_regs.entries.front();
@@ -251,6 +251,10 @@ public:
 
     bool update_signal = false;
 
+    if(*_rob_output != rob_output) {
+      *_rob_output = rob_output;
+      update_signal = true;
+    }
     if(*_miu_output != miu_output) {
       *_miu_output = miu_output;
       update_signal = true;
@@ -269,6 +273,7 @@ private:
   const std::shared_ptr<const WH_FLUSH_PIPELINE> _flush_input;
   const std::shared_ptr<const WH_CDB_OUT> _data_input;
 
+  const std::shared_ptr<WH_LSB_ROB> _rob_output;
   const std::shared_ptr<WH_LSB_MIU> _miu_output;
   const std::shared_ptr<WH_LSB_CDB> _data_output;
 

@@ -113,6 +113,13 @@ struct WH_ROB_LSB {
   auto operator<=>(const WH_ROB_LSB &) const = default;
 };
 
+struct WH_LSB_ROB {
+  bool is_valid;
+  rob_index_t rob_index; // the latest one to store
+
+  auto operator<=>(const WH_LSB_ROB &) const = default;
+};
+
 struct WH_DU_ROB {
   bool is_valid = false;
   raw_instr_t raw_instr;

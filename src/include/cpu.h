@@ -27,7 +27,7 @@ class CPU {
   using IFU  = InstructionFetchUnit<IFUSize>;
   using DU   = DispatchUnit;
   using ROB  = ReorderBuffer<ROBSize>;
-  using ALU = CommonALU;
+  using ALU  = CommonALU;
   using LSB  = LoadStoreBuffer<LSBSize>;
   using RS   = ReservationStation<RSSize>;
   using PRED = Predictor;
@@ -65,6 +65,7 @@ public:
     auto wh_rob_du    = std::make_shared<WH_ROB_DU>();
     auto wh_rob_rf    = std::make_shared<WH_ROB_RF>();
     auto wh_rob_lsb   = std::make_shared<WH_ROB_LSB>();
+    auto wh_lsb_rob   = std::make_shared<WH_LSB_ROB>();
     auto wh_du_rob    = std::make_shared<WH_DU_ROB>();
     auto wh_cdb_out   = std::make_shared<WH_CDB_OUT>();
     auto wh_lsb_cdb   = std::make_shared<WH_LSB_CDB>();
@@ -108,6 +109,7 @@ public:
     _rob = std::make_shared<ROB>(
       wh_du_rob,
       wh_cdb_out,
+      wh_lsb_rob,
       wh_rob_lsb,
       wh_rob_du,
       wh_rob_pred,
@@ -153,6 +155,7 @@ public:
       wh_rob_lsb,
       wh_flush,
       wh_cdb_out,
+      wh_lsb_rob,
       wh_lsb_miu,
       wh_lsb_cdb
     );

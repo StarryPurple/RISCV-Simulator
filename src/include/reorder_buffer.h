@@ -1,6 +1,8 @@
 #ifndef ISM_REORDER_BUFFER_H
 #define ISM_REORDER_BUFFER_H
 
+#include <cassert>
+
 #include "circular_queue.h"
 #include "wire_harness.h"
 #include "common.h"
@@ -45,6 +47,7 @@ public:
   ReorderBuffer(
     std::shared_ptr<const WH_DU_ROB> du_input,
     std::shared_ptr<const WH_CDB_OUT> data_input,
+    std::shared_ptr<const WH_LSB_ROB> lsb_input,
     std::shared_ptr<WH_ROB_LSB> lsb_output,
     std::shared_ptr<WH_ROB_DU> du_output,
     std::shared_ptr<WH_ROB_PRED> pred_output,
@@ -52,6 +55,7 @@ public:
     std::shared_ptr<WH_FLUSH_PIPELINE> flush_output
     ) :
   _du_input(std::move(du_input)), _data_input(std::move(data_input)),
+  _lsb_input(std::move(lsb_input)),
   _lsb_output(std::move(lsb_output)), _du_output(std::move(du_output)),
   _pred_output(std::move(pred_output)), _rf_output(std::move(rf_output)),
   _flush_output(std::move(flush_output)),
@@ -127,6 +131,11 @@ public:
       du_output.is_alloc_valid = true;
       du_output.rob_index = _nxt_regs.queue.back_index();
     }
+    if(_lsb_input->is_valid && _nxt_regs.queue.index_valid(_lsb_input->rob_index)) {
+      auto &record = _nxt_regs.queue.at(_lsb_input->rob_index);
+      assert(record.is_store);
+      record.is_ready = true;
+    }
     if(_data_input->entry.is_valid && _nxt_regs.queue.index_valid(_data_input->entry.rob_index)) {
       auto &record = _nxt_regs.queue.at(_data_input->entry.rob_index);
       if((record.is_load || record.is_store) && _data_input->from_alu) {
@@ -143,7 +152,7 @@ public:
       }
     }
     if(!_nxt_regs.queue.empty() && _nxt_regs.queue.front().is_ready) {
-      auto record = _nxt_regs.queue.front();
+      auto &record = _nxt_regs.queue.front();
       debug("ROB commited instr " + std::to_string(record.raw_instr) + " at address " + std::to_string(record.instr_addr));
       if(record.raw_instr == 0x0ff00513) {
         // terminate program. stop. The rest instructions (with this write) is ignored.
@@ -214,6 +223,7 @@ public:
 private:
   const std::shared_ptr<const WH_DU_ROB> _du_input;
   const std::shared_ptr<const WH_CDB_OUT> _data_input;
+  const std::shared_ptr<const WH_LSB_ROB> _lsb_input;
   const std::shared_ptr<WH_ROB_LSB> _lsb_output;
   const std::shared_ptr<WH_ROB_DU> _du_output;
   const std::shared_ptr<WH_ROB_PRED> _pred_output;
