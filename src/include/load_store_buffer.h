@@ -1,6 +1,7 @@
 #ifndef ISM_LOAD_STORE_BUFFER_H
 #define ISM_LOAD_STORE_BUFFER_H
 
+#include <cassert>
 #include <unordered_map>
 
 #include "common.h"
@@ -11,216 +12,247 @@ namespace insomnia {
 
 template <std::size_t BufSize>
 class LoadStoreBuffer : public CPUModule {
-  public:
-    struct Entry {
-      bool is_valid = false;
-      bool is_load = false;
-      bool is_store = false;
-      rob_index_t rob_index;
+  struct Entry {
+    bool is_valid = false;
+    bool is_load = false;
+    bool is_store = false;
+    mptr_diff_t data_len;
+    rob_index_t rob_index;
 
-      bool is_addr_ready = false;
-      mem_ptr_t addr = 0;
+    bool addr_ready = false;
+    mem_ptr_t addr_value;
 
-      bool is_data_ready = false;
-      mem_val_t data = 0;
-      mptr_diff_t data_len = 0;
+    bool data_ready = false;
+    rob_index_t data_index;
+    mem_val_t data_value;
 
-      bool miu_request_sent = false;
-      bool is_executed = false;
-      bool is_committed = false;
-      bool is_finished = false;
-    };
+    bool miu_request_sent = false;
+    bool is_executed = false;
+    bool is_committed = false;
+    bool is_finished = false;
+  };
 
-    struct Registers {
-      circular_queue<Entry, BufSize> entries;
+  struct Registers {
+    circular_queue<Entry, BufSize> entries;
 
-      bool load_sent = false;
-      bool store_sent = false;
-    };
+    bool load_sent = false;
+    bool store_sent = false;
 
-  public:
-    LoadStoreBuffer(
-      std::shared_ptr<const WH_MIU_LSB> miu_input,
-      std::shared_ptr<const WH_DU_LSB> du_input,
-      std::shared_ptr<const WH_ROB_LSB> rob_input,
-      std::shared_ptr<const WH_FLUSH_PIPELINE> flush_input,
-      std::shared_ptr<const WH_CDB_OUT> data_input,
-      std::shared_ptr<WH_LSB_MIU> miu_output,
-      std::shared_ptr<WH_LSB_CDB> data_output
-    ) :
-      _miu_input(std::move(miu_input)), _du_input(std::move(du_input)),
-      _rob_input(std::move(rob_input)), _flush_input(std::move(flush_input)),
-      _data_input(std::move(data_input)),
-      _miu_output(std::move(miu_output)), _data_output(std::move(data_output)),
-      _cur_regs(), _nxt_regs() {}
+    rob_index_t load_index;
+    rob_index_t store_index;
+  };
 
-    void sync() override {
-      _cur_regs = _nxt_regs;
-    }
+public:
+  LoadStoreBuffer(
+    std::shared_ptr<const WH_MIU_LSB> miu_input,
+    std::shared_ptr<const WH_DU_LSB> du_input,
+    std::shared_ptr<const WH_ROB_LSB> rob_input,
+    std::shared_ptr<const WH_FLUSH_PIPELINE> flush_input,
+    std::shared_ptr<const WH_CDB_OUT> data_input,
+    std::shared_ptr<WH_LSB_MIU> miu_output,
+    std::shared_ptr<WH_LSB_CDB> data_output
+  ) :
+    _miu_input(std::move(miu_input)), _du_input(std::move(du_input)),
+    _rob_input(std::move(rob_input)), _flush_input(std::move(flush_input)),
+    _data_input(std::move(data_input)),
+    _miu_output(std::move(miu_output)), _data_output(std::move(data_output)),
+    _cur_regs(), _nxt_regs() {}
 
-    bool update() override {
-      // debug("LSB");
-      _nxt_regs = _cur_regs;
+  void sync() override {
+    _cur_regs = _nxt_regs;
+  }
 
-      WH_LSB_MIU miu_output{};
-      WH_LSB_CDB data_output{};
-      _nxt_regs.load_sent = false;
-      _nxt_regs.store_sent = false;
+  bool update() override {
+    // debug("LSB");
+    _nxt_regs = _cur_regs;
+
+    WH_LSB_MIU miu_output{};
+    WH_LSB_CDB data_output{};
+    _nxt_regs.load_sent = false;
+    _nxt_regs.store_sent = false;
+
+
+    if(_flush_input->is_flush) {
+      _nxt_regs.entries.clear();
 
       bool update_signal = false;
-
-      if(_flush_input->is_flush) {
-        _nxt_regs.entries.clear();
-
-        update_signal = false;
-
-        if(*_miu_output != miu_output) {
-          *_miu_output = miu_output;
-          update_signal = true;
-        }
-
-        if(*_data_output != data_output) {
-          *_data_output = data_output;
-          update_signal = true;
-        }
-
-        return update_signal;
-      }
-
-      if(_miu_input->is_valid) {
-        if(!_nxt_regs.entries.empty()) {
-          auto &entry = _nxt_regs.entries.front();
-          if(entry.is_valid && entry.is_load && !entry.is_data_ready) {
-            entry.data = _miu_input->value;
-            entry.is_data_ready = true;
-            entry.is_executed = true;
-
-            data_output.entry.is_valid = true;
-            data_output.entry.rob_index = entry.rob_index;
-            data_output.entry.value = entry.data;
-          }
-        }
-      }
-
-      if(_du_input->is_valid) {
-        if(!_nxt_regs.entries.full()) {
-          debug("LSB: " + std::to_string(_du_input->rob_index));
-          Entry entry{
-            .is_valid = true,
-            .is_load = _du_input->is_load,
-            .is_store = _du_input->is_store,
-            .rob_index = _du_input->rob_index,
-            .data_len = _du_input->data_len,
-          };
-
-          if(entry.is_store) {
-            entry.data = _du_input->value;
-            entry.is_data_ready = _du_input->is_store_data_ready;
-          } else {
-            entry.is_data_ready = false;
-          }
-
-          _nxt_regs.entries.push(entry);
-        }
-      }
-
-      for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
-        auto &entry = _nxt_regs.entries.at(_nxt_regs.entries.front_index() + i);
-        if(entry.is_valid && entry.rob_index == _data_input->entry.rob_index &&
-           entry.is_store && !entry.is_addr_ready) {
-          entry.addr = _data_input->entry.value;
-          entry.is_addr_ready = true;
-          entry.is_executed = true;
-          break;
-        }
-      }
-
-      if(_rob_input->is_valid) {
-        for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
-          auto &entry = _nxt_regs.entries.at(_nxt_regs.entries.front_index() + i);
-          if(entry.is_valid && entry.rob_index == _rob_input->rob_index) {
-            entry.is_committed = true;
-            break;
-          }
-        }
-      }
-
-      for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
-        auto &entry = _nxt_regs.entries.at(_nxt_regs.entries.front_index() + i);
-        if(!entry.is_valid) continue;
-
-        if(entry.is_load && !entry.is_data_ready) {
-          bool forwarded = false;
-          for(std::size_t j = 0; j < i; ++j) {
-            auto& older_entry = _nxt_regs.entries.at(_nxt_regs.entries.front_index() + j);
-            if(older_entry.is_valid && older_entry.is_store && older_entry.is_data_ready &&
-               older_entry.addr == entry.addr && older_entry.data_len == entry.data_len) {
-              entry.data = older_entry.data;
-              entry.is_data_ready = true;
-              entry.is_executed = true;
-              forwarded = true;
-              data_output.entry.is_valid = true;
-              data_output.entry.rob_index = entry.rob_index;
-              data_output.entry.value = entry.data;
-              entry.is_finished = true;
-              break;
-            }
-          }
-
-          if(!forwarded && !entry.miu_request_sent && !_nxt_regs.load_sent) {
-            miu_output.is_load_request = true;
-            miu_output.addr = entry.addr;
-            miu_output.data_len = entry.data_len;
-            entry.miu_request_sent = true;
-            _nxt_regs.load_sent = true;
-          }
-        }
-
-        if(entry.is_store && entry.is_executed && entry.is_committed &&
-           !entry.is_finished && i == 0) {
-
-          if(!_nxt_regs.store_sent) {
-            miu_output.is_store_request = true;
-            miu_output.addr = entry.addr;
-            miu_output.value = entry.data;
-            miu_output.data_len = entry.data_len;
-            entry.is_finished = true;
-            _nxt_regs.store_sent = true;
-          }
-        }
-      }
-
-      while(_nxt_regs.entries.size() > 0) {
-        auto &entry = _nxt_regs.entries.front();
-        if(entry.is_valid && entry.is_committed && entry.is_finished) {
-          _nxt_regs.entries.pop();
-        } else {
-          break;
-        }
-      }
 
       if(*_miu_output != miu_output) {
         *_miu_output = miu_output;
         update_signal = true;
       }
+
       if(*_data_output != data_output) {
         *_data_output = data_output;
         update_signal = true;
       }
+
       return update_signal;
     }
 
-  private:
-    const std::shared_ptr<const WH_MIU_LSB> _miu_input;
-    const std::shared_ptr<const WH_DU_LSB> _du_input;
-    const std::shared_ptr<const WH_ROB_LSB> _rob_input;
-    const std::shared_ptr<const WH_FLUSH_PIPELINE> _flush_input;
-    const std::shared_ptr<const WH_CDB_OUT> _data_input;
+    // add entry
+    if(_du_input->is_valid && !_nxt_regs.entries.full()) {
+      debug("LSB: " + std::to_string(_du_input->rob_index));
+      _nxt_regs.entries.push(Entry{
+        .is_valid = true,
+        .is_load = _du_input->is_load,
+        .is_store = _du_input->is_store,
+        .data_len = _du_input->data_len,
+        .rob_index = _du_input->rob_index,
 
-    const std::shared_ptr<WH_LSB_MIU> _miu_output;
-    const std::shared_ptr<WH_LSB_CDB> _data_output;
+        .addr_ready = false,
 
-    Registers _cur_regs, _nxt_regs;
+        .data_ready = _du_input->data_ready,
+        .data_index = _du_input->data_index,
+        .data_value = _du_input->data_value,
+      });
+    }
+
+    // data load reply
+    if(_miu_input->is_load_reply) {
+      auto &entry = _nxt_regs.entries.at(_cur_regs.load_index);
+      assert(entry.is_valid && entry.is_load && !entry.is_data_ready);
+
+      entry.data_value = _miu_input->value;
+      entry.data_ready = true;
+      entry.is_executed = true;
+
+      _nxt_regs.load_sent = false;
+    }
+
+    // data store reply
+    if(_miu_input->is_store_reply) {
+      auto &entry = _nxt_regs.entries.at(_cur_regs.store_index);
+      entry.is_executed = true;
+      _nxt_regs.store_sent = false;
+    }
+
+    // cdb data broadcast (store_data_value/addr_value)
+    if(_data_input->entry.is_valid) {
+      for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
+        auto &entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + i) % BufSize);
+        assert(entry.is_valid);
+        // store data value (signal: data_index)
+        if(entry.is_store && !entry.data_ready && entry.data_index == _data_input->entry.rob_index) {
+          entry.data_ready = true;
+          entry.data_value = _data_input->entry.value;
+        }
+        // l/s addr value (signal: rob_index, from_alu)
+        // ... but it cannot come from lsb itself.
+        if(!entry.addr_ready && entry.rob_index == _data_input->entry.rob_index) {
+          entry.addr_ready = true;
+          entry.addr_value = _data_input->entry.value;
+        }
+      }
+    }
+
+    // rob commission
+    if(_rob_input->is_valid) {
+      for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
+        auto &entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + i) % BufSize);
+        assert(entry.is_valid);
+        if(entry.rob_index == _rob_input->rob_index) {
+          entry.is_committed = true;
+          break;
+        }
+      }
+    }
+
+    // data forward & execute load
+    for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
+      auto &entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + i) % BufSize);
+      assert(entry.is_valid);
+      if(entry.is_load && !entry.is_data_ready) {
+        bool has_reliance = false;
+        for(std::size_t j = i; j > 0; --j) {
+          auto& older_entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + j - 1) % BufSize);
+          if(older_entry.is_valid && older_entry.is_store &&
+             older_entry.addr == entry.addr) {
+            has_reliance = true;
+            if(older_entry.data_ready && older_entry.data_len == entry.data_len) {
+              entry.data_value = older_entry.data_value;
+              entry.is_data_ready = true;
+              entry.is_executed = true;
+              data_output.entry = CDBEntry{
+                .is_valid = true,
+                .rob_index = entry.rob_index,
+                .value = entry.data_value,
+              };
+            }
+            // only forward the latest one
+            break;
+          }
+        }
+
+        if(!has_reliance && !_cur_regs.load_sent) {
+          // load now.
+          miu_output = WH_LSB_MIU{
+            .is_load_request = true,
+            .addr = entry.addr_value,
+            .data_len = entry.data_len
+          };
+          _nxt_regs.load_sent = true;
+          _nxt_regs.load_index = (_nxt_regs.entries.front_index() + i) % BufSize;
+        }
+        // only one at a time
+        break;
+      }
+    }
+
+    // execute committed store
+    if(!_nxt_regs.entries.empty()) {
+      auto &entry = _nxt_regs.entries.front();
+      if(entry.is_store && !entry.is_executed && entry.is_committed && !entry.is_finished) {
+        if(!_cur_regs.store_sent) {
+          miu_output = WH_LSB_MIU{
+            .is_store_request = true,
+            .addr = entry.addr_value,
+            .value = entry.data_value,
+            .data_len = entry.data_len
+          };
+          data_output.entry = CDBEntry{
+            .is_valid = true,
+            .rob_index = entry.rob_index
+          };
+          entry.is_finished = true;
+          _nxt_regs.store_sent = true;
+          _nxt_regs.store_index = _nxt_regs.entries.front_index();
+        }
+      }
+    }
+
+
+    while(_nxt_regs.entries.size() > 0) {
+      auto &entry = _nxt_regs.entries.front();
+      if(entry.is_committed && entry.is_finished) {
+        _nxt_regs.entries.pop();
+      } else break;
+    }
+
+    bool update_signal = false;
+
+    if(*_miu_output != miu_output) {
+      *_miu_output = miu_output;
+      update_signal = true;
+    }
+    if(*_data_output != data_output) {
+      *_data_output = data_output;
+      update_signal = true;
+    }
+    return update_signal;
+  }
+
+private:
+  const std::shared_ptr<const WH_MIU_LSB> _miu_input;
+  const std::shared_ptr<const WH_DU_LSB> _du_input;
+  const std::shared_ptr<const WH_ROB_LSB> _rob_input;
+  const std::shared_ptr<const WH_FLUSH_PIPELINE> _flush_input;
+  const std::shared_ptr<const WH_CDB_OUT> _data_input;
+
+  const std::shared_ptr<WH_LSB_MIU> _miu_output;
+  const std::shared_ptr<WH_LSB_CDB> _data_output;
+
+  Registers _cur_regs, _nxt_regs;
 };
 
 }

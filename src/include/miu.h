@@ -23,10 +23,11 @@ public:
   MemoryInterfaceUnit(
     std::shared_ptr<const WH_LSB_MIU> lsb_input,
     std::shared_ptr<const WH_IFU_MIU> ifu_input,
+    std::shared_ptr<const WH_FLUSH_PIPELINE> flush_input,
     std::shared_ptr<WH_MIU_IFU> ifu_output,
     std::shared_ptr<WH_MIU_LSB> lsb_output
     ) :
-  _lsb_input(std::move(lsb_input)), _ifu_input(std::move(ifu_input)),
+  _lsb_input(std::move(lsb_input)), _ifu_input(std::move(ifu_input)), _flush_input(std::move(flush_input)),
   _ifu_output(std::move(ifu_output)), _lsb_output(std::move(lsb_output)),
   _mem(),
   _cur_stat(State::IDLE), _nxt_stat(State::IDLE),
@@ -44,25 +45,45 @@ public:
     WH_MIU_IFU ifu_output{};
     WH_MIU_LSB lsb_output{};
 
+    if(_flush_input->is_flush) {
+      // terminate everything.
+      _nxt_stat = State::IDLE;
+
+      bool update_signal = false;
+
+      if(*_ifu_output != ifu_output) {
+        *_ifu_output = ifu_output;
+        update_signal = true;
+      }
+      if(*_lsb_output != lsb_output) {
+        *_lsb_output = lsb_output;
+        update_signal = true;
+      }
+      return update_signal;
+    }
+
     switch(_cur_stat) {
     case State::IDLE: {
       try_process();
     } break;
     case State::LSB_LOAD: {
       if(--_nxt_regs.clk_delay == 0) {
-        lsb_output.is_valid = true;
+        lsb_output.is_load_reply = true;
         lsb_output.value = read_mem(_cur_regs.addr, _cur_regs.data_len);
         debug("Load data: " + std::to_string(lsb_output.value) + " with data len " + std::to_string(_cur_regs.data_len)
           + " at address " + std::to_string(_cur_regs.addr));
-        try_process();
+        _nxt_stat = State::IDLE;
+        // try_process();
       }
     } break;
     case State::LSB_STORE: {
       if(--_nxt_regs.clk_delay == 0) {
+        lsb_output.is_store_reply = true;
         write_mem(_cur_regs.addr, _cur_regs.data_len, _cur_regs.value);
         debug("Store data: " + std::to_string(_cur_regs.value) + " with data len " + std::to_string(_cur_regs.data_len)
           + " at address " + std::to_string(_cur_regs.addr));
-        try_process();
+        _nxt_stat = State::IDLE;
+        // try_process();
       }
     } break;
     case State::IFU_FETCH: {
@@ -73,7 +94,8 @@ public:
         ifu_output.instr_addr = _cur_regs.addr;
         debug("Load instr: " + std::to_string(ifu_output.raw_instr) + " with data len " + std::to_string(_cur_regs.data_len)
         + " at address " + std::to_string(_cur_regs.addr));
-        try_process();
+        _nxt_stat = State::IDLE;
+        // try_process(); // some duplication race
       }
     } break;
     }
@@ -100,6 +122,7 @@ public:
 private:
   const std::shared_ptr<const WH_LSB_MIU> _lsb_input;
   const std::shared_ptr<const WH_IFU_MIU> _ifu_input;
+  const std::shared_ptr<const WH_FLUSH_PIPELINE> _flush_input;
   const std::shared_ptr<WH_MIU_IFU> _ifu_output;
   const std::shared_ptr<WH_MIU_LSB> _lsb_output;
   std::array<uint8_t, RAMCap> _mem;

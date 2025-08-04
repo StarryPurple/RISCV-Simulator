@@ -23,8 +23,10 @@ public:
     // lsb first. alu second.
     if(_lsb_input->entry.is_valid) {
       output.entry = _lsb_input->entry;
+      output.from_lsb = true;
     } else if(_alu_input->entry.is_valid) {
       output.entry = _alu_input->entry;
+      output.from_alu = true;
     }
 
     if(output.entry.is_valid)

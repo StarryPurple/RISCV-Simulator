@@ -34,8 +34,9 @@ struct WH_IFU_MIU {
 
 // load data
 struct WH_MIU_LSB {
-  bool is_valid = false;
-  mem_val_t value{};
+  bool is_load_reply = false;
+  bool is_store_reply = false;
+  mem_val_t value;
   auto operator<=>(const WH_MIU_LSB &) const = default;
 };
 
@@ -43,9 +44,9 @@ struct WH_MIU_LSB {
 struct WH_LSB_MIU {
   bool is_load_request = false;
   bool is_store_request = false;
-  mem_ptr_t addr{};
-  mem_val_t value{};
-  mptr_diff_t data_len{};
+  mem_ptr_t addr;
+  mem_val_t value;
+  mptr_diff_t data_len;
   auto operator<=>(const WH_LSB_MIU &) const = default;
 };
 
@@ -152,6 +153,8 @@ struct CDBEntry {
 // listener: ROB, RS, DU
 struct WH_CDB_OUT {
   CDBEntry entry;
+  bool from_alu = false;
+  bool from_lsb = false;
 
   auto operator<=>(const WH_CDB_OUT &) const = default;
 };
@@ -200,9 +203,12 @@ struct WH_DU_LSB {
   mptr_diff_t data_len;
   bool is_load = false;
   bool is_store = false;
-  bool is_store_data_ready;
-  rob_index_t rob_index; // store data no ready
-  mem_val_t value; // store data ready
+
+  bool data_ready;
+  rob_index_t data_index;
+  mem_ptr_t data_value;
+
+  rob_index_t rob_index; // target rob index
 
   auto operator<=>(const WH_DU_LSB &) const = default;
 };

@@ -82,6 +82,7 @@ public:
     _miu = std::make_shared<MIU>(
       wh_lsb_miu,
       wh_ifu_miu,
+      wh_flush,
       wh_miu_ifu,
       wh_miu_lsb
     );

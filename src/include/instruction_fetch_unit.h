@@ -1,6 +1,8 @@
 #ifndef ISM_INSTRUCTION_FETCH_UNIT_H
 #define ISM_INSTRUCTION_FETCH_UNIT_H
 
+#include <cassert>
+
 #include "common.h"
 #include "instruction.h" // pre-decoding
 #include "wire_harness.h"
@@ -67,6 +69,8 @@ public:
       miu_output.pc = _nxt_regs.pc;
       _nxt_stat = State::IDLE;
     } else {
+
+      assert(_nxt_regs.queue.size() < 2 || _nxt_regs.queue.front().instr_addr != _nxt_regs.queue.back().instr_addr);
 
       // send...
       // pc not valid when handling br/jmp

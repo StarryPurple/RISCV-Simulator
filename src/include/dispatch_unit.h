@@ -269,15 +269,22 @@ public:
           .is_branch = is_branch_instr,
           .pred_pc = _nxt_regs.instr_addr + 4
         };
-        if(_nxt_regs.instr.is_load() || _nxt_regs.instr.is_store()) {
+        if(_nxt_regs.instr.is_load()) {
           lsb_output = WH_DU_LSB{
             .is_valid = true,
             .data_len = _nxt_regs.instr.mem_data_len(),
-            .is_load = _nxt_regs.instr.is_load(),
-            .is_store = _nxt_regs.instr.is_store(),
-            .is_store_data_ready = _nxt_regs.src2_ready,
+            .is_load = true,
             .rob_index = _nxt_regs.alloc_rob_index,
-            .value = _nxt_regs.src2_value
+          };
+        } else if(_nxt_regs.instr.is_store()) {
+          lsb_output = WH_DU_LSB{
+            .is_valid = true,
+            .data_len = _nxt_regs.instr.mem_data_len(),
+            .is_store = true,
+            .data_ready = _nxt_regs.src2_ready,
+            .data_index = _nxt_regs.src2_index,
+            .data_value = _nxt_regs.src2_value,
+            .rob_index = _nxt_regs.alloc_rob_index,
           };
         }
         _nxt_regs.state = State::DISPATCHING;
