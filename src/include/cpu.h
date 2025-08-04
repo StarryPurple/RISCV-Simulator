@@ -169,7 +169,6 @@ public:
       wh_rs_du
     );
 
-    // 3. Populate _modules array in logical execution order
     _modules = {
       _miu,
       _cdb,
@@ -217,7 +216,7 @@ public:
 
     debug("Clock cycle " + std::to_string(_clk) + ":++++++++++++++++++");
     for(bool stabilized = false; !stabilized; ) {
-      debug("Try update-----------");
+      // debug("Try update-----------");
       stabilized = true;
       // You can even shuffle the modules here.
       // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));

@@ -81,14 +81,22 @@ public:
   void sync() override {
     _cur_regs = _nxt_regs;
 
-    if(_cur_regs.rob_entry_allocated_ack){
+    if(_cur_regs.rob_entry_allocated_ack) {
       _mapping_table[_cur_regs.dst_reg].is_ready = false;
       _mapping_table[_cur_regs.dst_reg].rob_index = _cur_regs.alloc_rob_index;
     }
 
     if(_cdb_input->entry.is_valid) {
-      for(std::size_t i = 0; i < RFSize; ++i){
+      for(std::size_t i = 0; i < RFSize; ++i) {
         if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _cdb_input->entry.rob_index) {
+          _mapping_table[i].is_ready = true;
+        }
+      }
+    }
+
+    if(_rob_input->is_commit) {
+      for(std::size_t i = 0; i < RFSize; ++i) {
+        if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _rob_input->commit_index) {
           _mapping_table[i].is_ready = true;
         }
       }
@@ -170,6 +178,7 @@ public:
         .is_jalr = _nxt_regs.instr.is_jalr(),
         .instr_addr = _nxt_regs.instr_addr,
         .pred_pc = _nxt_regs.next_pc,
+        .is_load = _nxt_regs.instr.is_load(),
         .is_store = _nxt_regs.instr.is_store(),
         .data_len = _nxt_regs.instr.mem_data_len(),
         .write_rf = _nxt_regs.instr.write_rf(),

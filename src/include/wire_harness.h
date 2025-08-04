@@ -94,6 +94,9 @@ struct WH_ROB_DU {
   bool is_alloc_valid = false;
   rob_index_t rob_index;
 
+  bool is_commit = false;
+  rob_index_t commit_index;
+
   auto operator<=>(const WH_ROB_DU &) const = default;
 };
 
@@ -129,6 +132,7 @@ struct WH_DU_ROB {
   mem_ptr_t instr_addr;
   mem_ptr_t pred_pc;
 
+  bool is_load = false;
   bool is_store = false;
   mem_ptr_t store_addr;
   mem_val_t store_value;

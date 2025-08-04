@@ -120,6 +120,7 @@ public:
         .is_jalr = _du_input->is_jalr,
         .instr_addr = _du_input->instr_addr,
         .pred_pc = _du_input->pred_pc,
+        .is_load = _du_input->is_load,
         .is_store = _du_input->is_store,
         .store_addr = _du_input->store_addr,
         .store_value = _du_input->store_value,
@@ -177,12 +178,26 @@ public:
           rf_output.dst_reg = record.dst_reg;
           rf_output.value = record.rf_value;
           rf_output.raw_instr = record.raw_instr;
+
+          du_output.is_commit = true;
+          du_output.commit_index = _nxt_regs.queue.front_index();
         }
       } else if(record.is_store || record.is_load) {
         // A memory interaction instruction.
         // LSB interaction
         lsb_output.is_valid = true;
         lsb_output.rob_index = _nxt_regs.queue.front_index();
+        if(record.write_rf) {
+          // Prediction succeeded & instruction is jalr/need to write RF.
+          // write x[rd] = val.
+          // RF interaction
+          rf_output.is_valid = true;
+          rf_output.dst_reg = record.dst_reg;
+          rf_output.value = record.rf_value;
+          rf_output.raw_instr = record.raw_instr;
+          du_output.is_commit = true;
+          du_output.commit_index = _nxt_regs.queue.front_index();
+        }
       } else {
         // just a normal arithmetic instruction.
         // RF interaction
@@ -190,7 +205,10 @@ public:
         rf_output.dst_reg = record.dst_reg;
         rf_output.value = record.rf_value;
         rf_output.raw_instr = record.raw_instr;
+        du_output.is_commit = true;
+        du_output.commit_index = _nxt_regs.queue.front_index();
       }
+      debug("Pop queue");
       _nxt_regs.queue.pop(); // also popping the one with flush pc... This design can be changed.
     }
 

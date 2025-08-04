@@ -157,11 +157,15 @@ private:
     mem_val_t val = 0;
     for(size_t i = 0; i < data_len; ++i)
       val |= static_cast<mem_val_t>(_mem[addr + i]) << (i * 8);
+    debug("MIU: Read " + std::to_string(val) + " with data len " + std::to_string(data_len) +
+      " from addr " + std::to_string(addr));
     return val;
   }
   void write_mem(mem_ptr_t addr, mptr_diff_t data_len, mem_val_t val) {
     if(addr + data_len > RAMCap)
       throw std::runtime_error("MIU: Write memory access out of RAM bound");
+    debug("MIU: Write " + std::to_string(val) + " with data len " + std::to_string(data_len) +
+      " to addr " + std::to_string(addr));
     for(size_t i = 0; i < data_len; ++i)
       _mem[addr + i] = static_cast<uint8_t>((val >> (i * 8)) & 0xff);
   }

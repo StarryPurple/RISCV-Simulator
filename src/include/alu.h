@@ -70,6 +70,8 @@ public:
     }
 
     if(_nxt_regs.is_busy) {
+      debug("ALU: Calculate addr " + std::to_string(_nxt_regs.instr_addr) +
+        ", rob index " + std::to_string(_nxt_regs.rob_index));
       mem_val_t result = 0;
       mem_ptr_t real_branch_pc = 0;
       bool is_branch = false;
