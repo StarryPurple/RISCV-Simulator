@@ -86,7 +86,7 @@ public:
         result = _nxt_regs.src1_value - _nxt_regs.src2_value;
         break;
       case InstrType::SLT:
-        result = (_nxt_regs.src1_value < _nxt_regs.src2_value) ? 1 : 0;
+        result = (static_cast<int32_t>(_nxt_regs.src1_value) < static_cast<int32_t>(_nxt_regs.src2_value)) ? 1 : 0;
         break;
       case InstrType::SLTU:
         result = (static_cast<uint64_t>(_nxt_regs.src1_value) < static_cast<uint64_t>(_nxt_regs.src2_value)) ? 1 : 0;
@@ -115,6 +115,12 @@ public:
       case InstrType::SLLI:
         result = _nxt_regs.src1_value << shamt;
         break;
+      case InstrType::SLTI:
+        result = (static_cast<int32_t>(_nxt_regs.src1_value) < static_cast<int32_t>(_nxt_regs.imm)) ? 1 : 0;
+        break;
+      case InstrType::SLTIU:
+        result = (_nxt_regs.src1_value < _nxt_regs.imm) ? 1 : 0;
+        break;
       case InstrType::SRL:
         result = static_cast<uint32_t>(_nxt_regs.src1_value) >> (_nxt_regs.src2_value & 0x1f);
         break;
@@ -122,10 +128,10 @@ public:
         result = static_cast<uint32_t>(_nxt_regs.src1_value) >> shamt;
         break;
       case InstrType::SRA:
-        result = _nxt_regs.src1_value >> (_nxt_regs.src2_value & 0x1f);
+        result = static_cast<int32_t>(_nxt_regs.src1_value) >> (_nxt_regs.src2_value & 0x1f);
         break;
       case InstrType::SRAI:
-        result = _nxt_regs.src1_value >> shamt;
+        result = static_cast<int32_t>(_nxt_regs.src1_value) >> shamt;
         break;
       case InstrType::LUI:
         result = _nxt_regs.imm << 12;

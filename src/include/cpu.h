@@ -235,8 +235,8 @@ public:
     debug("Clock cycle " + std::to_string(_clk) + "ends.");
   }
 
-  mem_val_t get_reg(int i) const {
-    return _rf->get_reg(i);
+  mem_val_t get_ret() const {
+    return _rf->get_reg(10) & 0xff;
   }
 };
 

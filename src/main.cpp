@@ -2,7 +2,7 @@
 #include "bcpu.h"
 
 int main() {
-  insomnia::BCPU cpu;
+  insomnia::CPU cpu;
   cpu.preload_program();
   while(cpu.tick()) {}
   std::cout << cpu.get_ret() << std::endl;
