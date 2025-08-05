@@ -48,7 +48,6 @@ public:
     WH_ALU_CDB cdb_output{};
     WH_ALU_RS rs_output{};
 
-
     if(_flush_input->is_flush) {
       _nxt_regs.is_busy = false;
       _nxt_regs.instr_type = InstrType::INVALID;
@@ -68,7 +67,6 @@ public:
         _nxt_regs.pred_pc = _rs_input->pred_pc;
       }
     }
-
     if(_nxt_regs.is_busy) {
       debug("ALU: Calculate addr " + std::to_string(_nxt_regs.instr_addr) +
         ", rob index " + std::to_string(_nxt_regs.rob_index));
@@ -220,9 +218,7 @@ public:
       _nxt_regs.instr_type = InstrType::INVALID;
     }
 
-    rs_output = WH_ALU_RS{
-      .can_accept_instr = !_nxt_regs.is_busy
-    };
+    rs_output.can_accept_instr = !_nxt_regs.is_busy;
 
     bool update_signal = false;
 

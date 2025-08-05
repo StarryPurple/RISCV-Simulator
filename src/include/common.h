@@ -23,7 +23,7 @@ using clock_t     = uint32_t;
 using rob_index_t = uint32_t;
 using rf_index_t  = uint8_t;  // 0~31
 
-constexpr std::size_t RAMSize = 1 << 22; // 4KB
+constexpr std::size_t RAMSize = 1 << 20; // 1KB
 constexpr std::size_t IFUSize = 8;
 constexpr std::size_t ROBSize = 16;
 constexpr std::size_t LSBSize = 16;

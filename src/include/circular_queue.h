@@ -72,32 +72,22 @@ public:
   // You'd better know what you're doing.
   const T& at(std::size_t index) const {
     std::size_t f = _rear + _size - 1;
-    if(f > Len) {
-      if(f - Len < index && index < _rear)
-        throw std::runtime_error("read in invalid place.");
-    } else {
-      if(index < _rear || index > f)
-        throw std::runtime_error("read in invalid place.");
-    }
+    if(!index_valid(index))
+      throw std::runtime_error("read in invalid place.");
     return _data[index];
   }
 
   // You'd better know what you're doing.
   T& at(std::size_t index) {
     std::size_t f = _rear + _size - 1;
-    if(f > Len) {
-      if(f - Len < index && index < _rear)
-        throw std::runtime_error("read in invalid place.");
-    } else {
-      if(index < _rear || index > f)
-        throw std::runtime_error("read in invalid place.");
-    }
+    if(!index_valid(index))
+      throw std::runtime_error("read in invalid place.");
     return _data[index];
   }
 
   bool index_valid(std::size_t index) const {
     std::size_t f = _rear + _size - 1;
-    if(f > Len) {
+    if(f >= Len) {
       if(f - Len < index && index < _rear) return false;
     } else {
       if(index < _rear || index > f) return false;

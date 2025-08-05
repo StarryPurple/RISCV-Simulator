@@ -190,7 +190,8 @@ public:
     mem_ptr_t cur_ptr = 0, diff_ptr = 0;
     raw_instr_t raw_instr = 0;
     int hex_cnt = 0;
-    for(char ch = std::cin.get(); ch != EOF; ch = std::cin.get()) {
+    // the character & is designed for debug.
+    for(char ch = std::cin.get(); ch != EOF && ch != '&'; ch = std::cin.get()) {
       if(is_delim(ch)) continue;
       if(ch == '@') {
         cur_ptr = 0;
@@ -214,7 +215,7 @@ public:
   bool tick() {
     ++_clk;
 
-    debug("Clock cycle " + std::to_string(_clk) + ":++++++++++++++++++");
+    debug("Clk " + std::to_string(_clk));
     for(bool stabilized = false; !stabilized; ) {
       // debug("Try update-----------");
       stabilized = true;

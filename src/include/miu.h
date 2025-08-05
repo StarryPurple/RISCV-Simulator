@@ -72,8 +72,8 @@ public:
       if(--_nxt_regs.clk_delay == 0) {
         lsb_output.is_load_reply = true;
         lsb_output.value = read_mem(_cur_regs.addr, _cur_regs.data_len);
-        // debug("Load data: " + std::to_string(lsb_output.value) + " with data len " + std::to_string(_cur_regs.data_len)
-        //   + " at address " + std::to_string(_cur_regs.addr));
+        debug("Load data: " + std::to_string(lsb_output.value) + " with data len " + std::to_string(_cur_regs.data_len)
+          + " at address " + std::to_string(_cur_regs.addr));
         _nxt_stat = State::IDLE;
         // try_process();
       }
@@ -82,8 +82,8 @@ public:
       if(--_nxt_regs.clk_delay == 0) {
         lsb_output.is_store_reply = true;
         write_mem(_cur_regs.addr, _cur_regs.data_len, _cur_regs.value);
-        // debug("Store data: " + std::to_string(_cur_regs.value) + " with data len " + std::to_string(_cur_regs.data_len)
-        //  + " at address " + std::to_string(_cur_regs.addr));
+        debug("Store data: " + std::to_string(_cur_regs.value) + " with data len " + std::to_string(_cur_regs.data_len)
+         + " at address " + std::to_string(_cur_regs.addr));
         _nxt_stat = State::IDLE;
         // try_process();
       }
@@ -94,8 +94,8 @@ public:
         ifu_output.raw_instr = static_cast<raw_instr_t>(
           read_mem(_cur_regs.addr, _cur_regs.data_len));
         ifu_output.instr_addr = _cur_regs.addr;
-        // debug("Load instr: " + std::to_string(ifu_output.raw_instr) + " with data len " + std::to_string(_cur_regs.data_len)
-        // + " at address " + std::to_string(_cur_regs.addr));
+        debug("Load instr: " + std::to_string(ifu_output.raw_instr) + " with data len " + std::to_string(_cur_regs.data_len)
+        + " at address " + std::to_string(_cur_regs.addr));
         _nxt_stat = State::IDLE;
         // try_process(); // some duplication race
       }
@@ -159,15 +159,15 @@ private:
     mem_val_t val = 0;
     for(size_t i = 0; i < data_len; ++i)
       val |= static_cast<mem_val_t>(_mem[addr + i]) << (i * 8);
-    debug("MIU: Read " + std::to_string(val) + " with data len " + std::to_string(data_len) +
-      " from addr " + std::to_string(addr));
+    // debug("MIU: Read " + std::to_string(val) + " with data len " + std::to_string(data_len) +
+    //   " from addr " + std::to_string(addr));
     return val;
   }
   void write_mem(mem_ptr_t addr, mptr_diff_t data_len, mem_val_t val) {
     if(addr + data_len > RAMCap)
       throw std::runtime_error("MIU: Write memory access out of RAM bound");
-    debug("MIU: Write " + std::to_string(val) + " with data len " + std::to_string(data_len) +
-      " to addr " + std::to_string(addr));
+    // debug("MIU: Write " + std::to_string(val) + " with data len " + std::to_string(data_len) +
+    //   " to addr " + std::to_string(addr));
     for(size_t i = 0; i < data_len; ++i)
       _mem[addr + i] = static_cast<uint8_t>((val >> (i * 8)) & 0xff);
   }

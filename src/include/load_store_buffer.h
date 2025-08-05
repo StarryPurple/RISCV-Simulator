@@ -40,6 +40,15 @@ class LoadStoreBuffer : public CPUModule {
 
     std::size_t load_index;
     std::size_t store_index;
+
+    bool accept_data = false;
+    bool accept_addr = false;
+
+    std::size_t data_index;
+    std::size_t addr_index;
+
+    mem_val_t data_ack;
+    mem_ptr_t addr_ack;
   };
 
 public:
@@ -81,6 +90,8 @@ public:
 
       _nxt_regs.load_sent = false;
       _nxt_regs.store_sent = false;
+      _nxt_regs.accept_addr = false;
+      _nxt_regs.accept_data = false;
 
       bool update_signal = false;
 
@@ -123,41 +134,56 @@ public:
     // data load reply
     if(_miu_input->is_load_reply) {
       auto &entry = _nxt_regs.entries.at(_cur_regs.load_index);
-      assert(entry.is_valid && entry.is_load && !entry.data_ready);
-
-      debug("LSB: loaded " + std::to_string(_miu_input->value) +
-        " at " + std::to_string(entry.addr_value) + " for rob idx "
-        + std::to_string(entry.rob_index));
-
-      entry.data_value = _miu_input->value;
-      entry.data_ready = true;
-      entry.is_executed = true;
-
-      data_output.entry = CDBEntry{
-        .is_valid = true,
-        .rob_index = entry.rob_index,
-        .value = entry.data_value,
-      };
-
-      _nxt_regs.load_sent = false;
+      // might be forwarded in waiting load reply
+      if(!entry.data_ready) {
+        debug("LSB: loaded " + std::to_string(_miu_input->value) +
+          " at " + std::to_string(entry.addr_value) + " for rob idx "
+          + std::to_string(entry.rob_index));
+        entry.data_value = _miu_input->value;
+        entry.data_ready = true;
+        entry.is_executed = true;
+        data_output.entry = CDBEntry{
+          .is_valid = true,
+          .rob_index = entry.rob_index,
+          .value = entry.data_value,
+        };
+        _nxt_regs.load_sent = false;
+      }
     }
 
+    if(_cur_regs.accept_addr) {
+      auto &entry = _nxt_regs.entries.at(_cur_regs.addr_index);
+      entry.addr_ready = true;
+      entry.addr_value = _cur_regs.addr_ack;
+    }
+
+    if(_cur_regs.accept_data) {
+      auto &entry = _nxt_regs.entries.at(_cur_regs.data_index);
+      entry.data_ready = true;
+      entry.data_value = _cur_regs.data_ack;
+    }
+
+    _nxt_regs.accept_addr = false;
+    _nxt_regs.accept_data = false;
 
     // cdb data broadcast (store_data_value/addr_value)
     if(_data_input->entry.is_valid) {
       for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
-        auto &entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + i) % BufSize);
+        auto index = (_nxt_regs.entries.front_index() + i) % BufSize;
+        auto &entry = _nxt_regs.entries.at(index);
         assert(entry.is_valid);
         // store data value (signal: data_index)
         if(entry.is_store && !entry.data_ready && entry.data_index == _data_input->entry.rob_index) {
-          entry.data_ready = true;
-          entry.data_value = _data_input->entry.value;
+          _nxt_regs.accept_data = true;
+          _nxt_regs.data_ack = _data_input->entry.value;
+          _nxt_regs.data_index = index;
         }
         // l/s addr value (signal: rob_index, from_alu)
         // from_alu is used in filtering the signal called by itself.
         if(!entry.addr_ready && entry.rob_index == _data_input->entry.rob_index && _data_input->from_alu) {
-          entry.addr_ready = true;
-          entry.addr_value = _data_input->entry.value;
+          _nxt_regs.accept_addr = true;
+          _nxt_regs.addr_ack = _data_input->entry.value;
+          _nxt_regs.addr_index = index;
         }
       }
     }
@@ -180,7 +206,8 @@ public:
     for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
       auto &entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + i) % BufSize);
       assert(entry.is_valid);
-      if(entry.is_load && !entry.data_ready) {
+      // data output invalidness: broadcast one data per cycle.
+      if(entry.is_load && !entry.data_ready && !data_output.entry.is_valid) {
         bool has_reliance = false;
         for(std::size_t j = i; j > 0; --j) {
           auto& older_entry = _nxt_regs.entries.at((_nxt_regs.entries.front_index() + j - 1) % BufSize);

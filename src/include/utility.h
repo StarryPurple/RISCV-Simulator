@@ -6,6 +6,12 @@
 
 namespace insomnia {
 
+template <std::integral T>
+int32_t as_signed(T val) { return static_cast<int32_t>(val); }
+
+template <std::integral T>
+uint32_t as_unsigned(T val) { return static_cast<uint32_t>(val); }
+
 // sign extension. Len is for the expected digit number of the value.
 template <std::integral T, int Len>
 T sign_extend(T val) {
