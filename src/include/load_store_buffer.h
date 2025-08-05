@@ -75,7 +75,12 @@ public:
 
     // flush
     if(_flush_input->is_flush) {
-      _nxt_regs.entries.clear();
+      while(!_nxt_regs.entries.empty() && !_nxt_regs.entries.back().is_committed) {
+        _nxt_regs.entries.pop_back();
+      }
+
+      _nxt_regs.load_sent = false;
+      _nxt_regs.store_sent = false;
 
       bool update_signal = false;
 
@@ -119,6 +124,10 @@ public:
     if(_miu_input->is_load_reply) {
       auto &entry = _nxt_regs.entries.at(_cur_regs.load_index);
       assert(entry.is_valid && entry.is_load && !entry.data_ready);
+
+      debug("LSB: loaded " + std::to_string(_miu_input->value) +
+        " at " + std::to_string(entry.addr_value) + " for rob idx "
+        + std::to_string(entry.rob_index));
 
       entry.data_value = _miu_input->value;
       entry.data_ready = true;

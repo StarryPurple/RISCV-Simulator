@@ -94,6 +94,11 @@ struct WH_ROB_DU {
   bool is_alloc_valid = false;
   rob_index_t rob_index;
 
+  bool has_src1;
+  mem_val_t src1;
+  bool has_src2;
+  mem_val_t src2;
+
   bool is_commit = false;
   rob_index_t commit_index;
 
@@ -141,6 +146,7 @@ struct WH_DU_ROB {
   bool write_rf;
   uint8_t dst_reg;
 
+  Instruction instr;
 
   auto operator<=>(const WH_DU_ROB &) const = default;
 };

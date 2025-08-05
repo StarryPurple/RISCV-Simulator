@@ -182,7 +182,8 @@ public:
         .is_store = _nxt_regs.instr.is_store(),
         .data_len = _nxt_regs.instr.mem_data_len(),
         .write_rf = _nxt_regs.instr.write_rf(),
-        .dst_reg = _nxt_regs.instr.rd()
+        .dst_reg = _nxt_regs.instr.rd(),
+        .instr = _nxt_regs.instr
       };
       _nxt_regs.rob_request_sent = true;
       if(_rob_input->is_alloc_valid) {
@@ -195,6 +196,11 @@ public:
           _nxt_regs.src1_ready = true;
           _nxt_regs.src1_value = 0;
           _nxt_regs.src1_index = 0;
+        } else if(_rob_input->has_src1) {
+          // more updated than mapping table
+          _nxt_regs.src1_ready = true;
+          _nxt_regs.src1_index = 0;
+          _nxt_regs.src1_value = _rob_input->src1;
         } else if(_mapping_table[rs1_idx].is_ready) {
           rf_output.is_valid = true;
           rf_output.reqRi = true;
@@ -212,6 +218,11 @@ public:
           _nxt_regs.src2_ready = true;
           _nxt_regs.src2_value = 0;
           _nxt_regs.src2_index = 0;
+        } else if(_rob_input->has_src2) {
+          // more updated than mapping table
+          _nxt_regs.src2_ready = true;
+          _nxt_regs.src2_index = 0;
+          _nxt_regs.src2_value = _rob_input->src2;
         } else if(_mapping_table[rs2_idx].is_ready) {
           rf_output.is_valid = true;
           rf_output.reqRj = true;

@@ -105,6 +105,13 @@ public:
     return true;
   }
 
+  // be careful using this.
+  void pop_back() {
+    if(empty())
+      throw std::runtime_error("popping empty queue.");
+    --_size;
+  }
+
 private:
   T _data[Len]{};
   std::size_t _rear = 0, _size = 0;

@@ -129,6 +129,17 @@ public:
         .dst_reg = _du_input->dst_reg,
         .raw_instr = _du_input->raw_instr
       });
+      for(std::size_t i = 0; i < _nxt_regs.queue.size(); ++i) {
+        auto &entry = _nxt_regs.queue.at((_nxt_regs.queue.front_index() + i) % BufSize);
+        if(_du_input->instr.has_src1() && entry.dst_reg == _du_input->instr.rs1() && entry.is_ready) {
+          du_output.has_src1 = true;
+          du_output.src1 = entry.rf_value;
+        }
+        if(_du_input->instr.has_src2() && entry.dst_reg == _du_input->instr.rs2() && entry.is_ready) {
+          du_output.has_src2 = true;
+          du_output.src2 = entry.rf_value;
+        }
+      }
       du_output.is_alloc_valid = true;
       du_output.rob_index = _nxt_regs.queue.back_index();
     }

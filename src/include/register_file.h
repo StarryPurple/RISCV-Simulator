@@ -38,7 +38,7 @@ public:
 
     if(_rob_input->is_valid) {
       _nxt_regs.arr[_rob_input->dst_reg] = _rob_input->value;
-      debug("Reg" + std::to_string(_rob_input->dst_reg) + " is now " + std::to_string(_rob_input->value));
+      debug("Reg x" + std::to_string(_rob_input->dst_reg) + " is now " + std::to_string(_rob_input->value));
     }
 
     switch(_nxt_stat) {
