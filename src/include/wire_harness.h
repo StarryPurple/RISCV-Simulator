@@ -279,17 +279,6 @@ struct WH_RS_DU {
   auto operator<=>(const WH_RS_DU &) const = default;
 };
 
-
-
-
-
-
-
-
-
-
-
-
 }
 
 #endif // ISM_WIRE_HARNESS_H

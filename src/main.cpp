@@ -2,6 +2,7 @@
 #include "bcpu.h"
 
 int main() {
+  freopen("cpu.log", "w", stdout);
   insomnia::CPU cpu;
   cpu.preload_program();
   while(cpu.tick()) {}

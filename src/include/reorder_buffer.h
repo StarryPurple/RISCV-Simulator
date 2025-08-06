@@ -61,6 +61,10 @@ public:
   _flush_output(std::move(flush_output)),
   _cur_regs(), _nxt_regs(), _cur_stat(State::IDLE), _nxt_stat(State::IDLE) {}
   void sync() override {
+    if(!_cur_regs.queue.empty() && (_nxt_regs.queue.empty() || _cur_regs.queue.front().instr_addr != _nxt_regs.queue.front().instr_addr)) {
+      static int cnt = 0; ++cnt; // debug
+      std::cout << _cur_regs.queue.front().instr_addr << std::endl;
+    }
     _cur_regs = _nxt_regs;
     _cur_stat = _nxt_stat;
   }

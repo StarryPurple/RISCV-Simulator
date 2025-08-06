@@ -62,7 +62,9 @@ public:
   }
 
   bool tick() {
+    static int cnt = 0; ++cnt;
     raw_instr_t raw_instr = read_mem(_pc, 4);
+    std::cout << std::to_string(_pc) << std::endl;
     if(raw_instr == 0x0ff00513) return false;
     Instruction instr{raw_instr};
     auto rd = instr.rd();
