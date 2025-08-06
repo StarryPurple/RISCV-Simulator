@@ -152,18 +152,28 @@ public:
       assert(record.is_store);
       record.is_ready = true;
     }
-    if(_data_input->entry.is_valid && _nxt_regs.queue.index_valid(_data_input->entry.rob_index)) {
-      auto &record = _nxt_regs.queue.at(_data_input->entry.rob_index);
-      if((record.is_load || record.is_store) && _data_input->from_alu) {
+    if(_data_input->lsb_entry.is_valid && _nxt_regs.queue.index_valid(_data_input->lsb_entry.rob_index)) {
+      auto &record = _nxt_regs.queue.at(_data_input->lsb_entry.rob_index);
+      record.is_ready = true;
+      if(record.is_br || record.is_jalr) {
+        record.real_pc = _data_input->lsb_entry.real_pc;
+      }
+      if(record.write_rf) {
+        record.rf_value = _data_input->lsb_entry.value;
+      }
+    }
+    if(_data_input->alu_entry.is_valid && _nxt_regs.queue.index_valid(_data_input->alu_entry.rob_index)) {
+      auto &record = _nxt_regs.queue.at(_data_input->alu_entry.rob_index);
+      if(record.is_load || record.is_store) {
         // passing addr. ignore it.
         debug("Passing L/S target addr: instr addr " + std::to_string(record.instr_addr));
       } else {
         record.is_ready = true;
         if(record.is_br || record.is_jalr) {
-          record.real_pc = _data_input->entry.real_pc;
+          record.real_pc = _data_input->alu_entry.real_pc;
         }
         if(record.write_rf) {
-          record.rf_value = _data_input->entry.value;
+          record.rf_value = _data_input->alu_entry.value;
         }
       }
     }

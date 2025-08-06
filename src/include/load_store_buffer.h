@@ -167,22 +167,35 @@ public:
     _nxt_regs.accept_data = false;
 
     // cdb data broadcast (store_data_value/addr_value)
-    if(_data_input->entry.is_valid) {
+    if(_data_input->lsb_entry.is_valid) {
       for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
         auto index = (_nxt_regs.entries.front_index() + i) % BufSize;
         auto &entry = _nxt_regs.entries.at(index);
         assert(entry.is_valid);
         // store data value (signal: data_index)
-        if(entry.is_store && !entry.data_ready && entry.data_index == _data_input->entry.rob_index) {
+        if(entry.is_store && !entry.data_ready && entry.data_index == _data_input->lsb_entry.rob_index) {
           _nxt_regs.accept_data = true;
-          _nxt_regs.data_ack = _data_input->entry.value;
+          _nxt_regs.data_ack = _data_input->lsb_entry.value;
+          _nxt_regs.data_index = index;
+        }
+      }
+    }
+    if(_data_input->alu_entry.is_valid) {
+      for(std::size_t i = 0; i < _nxt_regs.entries.size(); ++i) {
+        auto index = (_nxt_regs.entries.front_index() + i) % BufSize;
+        auto &entry = _nxt_regs.entries.at(index);
+        assert(entry.is_valid);
+        // store data value (signal: data_index)
+        if(entry.is_store && !entry.data_ready && entry.data_index == _data_input->alu_entry.rob_index) {
+          _nxt_regs.accept_data = true;
+          _nxt_regs.data_ack = _data_input->alu_entry.value;
           _nxt_regs.data_index = index;
         }
         // l/s addr value (signal: rob_index, from_alu)
         // from_alu is used in filtering the signal called by itself.
-        if(!entry.addr_ready && entry.rob_index == _data_input->entry.rob_index && _data_input->from_alu) {
+        if(!entry.addr_ready && entry.rob_index == _data_input->alu_entry.rob_index) {
           _nxt_regs.accept_addr = true;
-          _nxt_regs.addr_ack = _data_input->entry.value;
+          _nxt_regs.addr_ack = _data_input->alu_entry.value;
           _nxt_regs.addr_index = index;
         }
       }

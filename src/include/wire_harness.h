@@ -169,9 +169,8 @@ struct CDBEntry {
 // broadcaster: ALU, LSB
 // listener: ROB, RS, DU
 struct WH_CDB_OUT {
-  CDBEntry entry;
-  bool from_alu = false;
-  bool from_lsb = false;
+  CDBEntry alu_entry;
+  CDBEntry lsb_entry;
 
   auto operator<=>(const WH_CDB_OUT &) const = default;
 };

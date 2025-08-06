@@ -18,20 +18,20 @@ public:
   _output(std::move(output)) {}
   void sync() override {}
   bool update() override {
-    // debug("CDB");
+    // debug("CDB");,
     WH_CDB_OUT output{};
-    // lsb first. alu second.
     if(_lsb_input->entry.is_valid) {
-      output.entry = _lsb_input->entry;
-      output.from_lsb = true;
-    } else if(_alu_input->entry.is_valid) {
-      output.entry = _alu_input->entry;
-      output.from_alu = true;
+      output.lsb_entry = _lsb_input->entry;
+      debug("LSB Broadcast: " + std::to_string(output.lsb_entry.rob_index) + ", " +
+        std::to_string(output.lsb_entry.value) + ", " +
+        std::to_string(output.lsb_entry.real_pc));
     }
-
-    if(output.entry.is_valid)
-      debug("Broadcast: " + std::to_string(output.entry.rob_index) + ", " + std::to_string(output.entry.value)
-      + ", " + std::to_string(output.entry.real_pc));
+    if(_alu_input->entry.is_valid) {
+      output.alu_entry = _alu_input->entry;
+      debug("ALU Broadcast: " + std::to_string(output.alu_entry.rob_index) + ", " +
+        std::to_string(output.alu_entry.value) + ", " +
+        std::to_string(output.alu_entry.real_pc));
+    }
 
     bool update_signal = false;
     if(*_output != output) {

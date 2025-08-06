@@ -84,15 +84,29 @@ public:
       return update_signal;
     }
 
-    if(_cdb_input->entry.is_valid) {
+    if(_cdb_input->lsb_entry.is_valid) {
       for(std::size_t i = 0; i < StnSize; ++i) {
         if(_nxt_regs.entries[i].is_valid) {
-          if(!_nxt_regs.entries[i].src1_ready && _nxt_regs.entries[i].src1_index == _cdb_input->entry.rob_index) {
-            _nxt_regs.entries[i].src1_value = _cdb_input->entry.value;
+          if(!_nxt_regs.entries[i].src1_ready && _nxt_regs.entries[i].src1_index == _cdb_input->lsb_entry.rob_index) {
+            _nxt_regs.entries[i].src1_value = _cdb_input->lsb_entry.value;
             _nxt_regs.entries[i].src1_ready = true;
           }
-          if(!_nxt_regs.entries[i].src2_ready && _nxt_regs.entries[i].src2_index == _cdb_input->entry.rob_index) {
-            _nxt_regs.entries[i].src2_value = _cdb_input->entry.value;
+          if(!_nxt_regs.entries[i].src2_ready && _nxt_regs.entries[i].src2_index == _cdb_input->lsb_entry.rob_index) {
+            _nxt_regs.entries[i].src2_value = _cdb_input->lsb_entry.value;
+            _nxt_regs.entries[i].src2_ready = true;
+          }
+        }
+      }
+    }
+    if(_cdb_input->alu_entry.is_valid) {
+      for(std::size_t i = 0; i < StnSize; ++i) {
+        if(_nxt_regs.entries[i].is_valid) {
+          if(!_nxt_regs.entries[i].src1_ready && _nxt_regs.entries[i].src1_index == _cdb_input->alu_entry.rob_index) {
+            _nxt_regs.entries[i].src1_value = _cdb_input->alu_entry.value;
+            _nxt_regs.entries[i].src1_ready = true;
+          }
+          if(!_nxt_regs.entries[i].src2_ready && _nxt_regs.entries[i].src2_index == _cdb_input->alu_entry.rob_index) {
+            _nxt_regs.entries[i].src2_value = _cdb_input->alu_entry.value;
             _nxt_regs.entries[i].src2_ready = true;
           }
         }

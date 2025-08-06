@@ -86,9 +86,17 @@ public:
       _mapping_table[_cur_regs.dst_reg].rob_index = _cur_regs.alloc_rob_index;
     }
 
-    if(_cdb_input->entry.is_valid) {
+    if(_cdb_input->lsb_entry.is_valid) {
       for(std::size_t i = 0; i < RFSize; ++i) {
-        if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _cdb_input->entry.rob_index) {
+        if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _cdb_input->lsb_entry.rob_index) {
+          _mapping_table[i].is_ready = true;
+        }
+      }
+    }
+
+    if(_cdb_input->alu_entry.is_valid) {
+      for(std::size_t i = 0; i < RFSize; ++i) {
+        if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _cdb_input->alu_entry.rob_index) {
           _mapping_table[i].is_ready = true;
         }
       }
@@ -253,13 +261,23 @@ public:
         }
       }
 
-      if(_cdb_input->entry.is_valid){
-        if(!_nxt_regs.src1_ready && _nxt_regs.src1_index == _cdb_input->entry.rob_index){
-          _nxt_regs.src1_value = _cdb_input->entry.value;
+      if(_cdb_input->lsb_entry.is_valid){
+        if(!_nxt_regs.src1_ready && _nxt_regs.src1_index == _cdb_input->lsb_entry.rob_index){
+          _nxt_regs.src1_value = _cdb_input->lsb_entry.value;
           _nxt_regs.src1_ready = true;
         }
-        if(!_nxt_regs.src2_ready && _nxt_regs.src2_index == _cdb_input->entry.rob_index){
-          _nxt_regs.src2_value = _cdb_input->entry.value;
+        if(!_nxt_regs.src2_ready && _nxt_regs.src2_index == _cdb_input->lsb_entry.rob_index){
+          _nxt_regs.src2_value = _cdb_input->lsb_entry.value;
+          _nxt_regs.src2_ready = true;
+        }
+      }
+      if(_cdb_input->alu_entry.is_valid){
+        if(!_nxt_regs.src1_ready && _nxt_regs.src1_index == _cdb_input->alu_entry.rob_index){
+          _nxt_regs.src1_value = _cdb_input->alu_entry.value;
+          _nxt_regs.src1_ready = true;
+        }
+        if(!_nxt_regs.src2_ready && _nxt_regs.src2_index == _cdb_input->alu_entry.rob_index){
+          _nxt_regs.src2_value = _cdb_input->alu_entry.value;
           _nxt_regs.src2_ready = true;
         }
       }
