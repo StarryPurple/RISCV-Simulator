@@ -34,9 +34,8 @@ class CPU {
   using RF   = RegisterFile;
   using CDB  = CommonDataBus;
 private:
-  mem_ptr_t _pc; // program counter register, isolated from RF.
   clock_t _clk;  // state machine update clock
-  std::array<std::shared_ptr<CPUModule>, 10> _modules; // CPU modules array, for traversion
+  std::array<std::shared_ptr<CPUModule>, 10> _modules; // CPU modules array, for traverse
 
   std::shared_ptr<MIU>  _miu;       // Memory Interface Unit (in contact with RAM)
   // std::shared_ptr<DEC>  _dec;       // Instruction Decoder
@@ -51,7 +50,7 @@ private:
   std::shared_ptr<CDB>  _cdb;       // Common Data Bus
 
 public:
-  CPU() : _pc(0), _clk(0) {
+  CPU() : _clk(0) {
 
     auto wh_miu_ifu   = std::make_shared<WH_MIU_IFU>();
     auto wh_ifu_miu   = std::make_shared<WH_IFU_MIU>();
@@ -118,7 +117,7 @@ public:
     );
 
     _ifu = std::make_shared<IFU>(
-      _pc,
+      0, // start from instr addr 0x0
       wh_miu_ifu,
       wh_pred_ifu,
       wh_flush,
@@ -181,7 +180,6 @@ public:
       _lsb,
       _rs
     };
-    // You can even shuffle the modules here.
     // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
   }
 
@@ -219,7 +217,6 @@ public:
     for(bool stabilized = false; !stabilized; ) {
       // debug("Try update-----------");
       stabilized = true;
-      // You can even shuffle the modules here.
       // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
       for(auto &module: _modules) {
         bool res = module->update();
@@ -227,12 +224,24 @@ public:
         if(res) stabilized = false;
       }
     }
-    // You can even shuffle the modules here.
+    if(_rob->to_terminate()) return false;
+    if(!_rob->_cur_regs.queue.empty() &&
+      (_rob->_nxt_regs.queue.empty() || _rob->_cur_regs.queue.front().instr_addr != _rob->_nxt_regs.queue.front().instr_addr)) {
+      static int cnt = 0; ++cnt; // debug
+      std::cout << _rob->_cur_regs.queue.front().instr_addr << std::endl;
+      auto &entry = _rob->_cur_regs.queue.front();
+      for(int i = 0; i < 16; ++i) {
+        auto o = _rf->get_reg(i);
+        if(_rob->_rf_output->is_valid && _rob->_rf_output->dst_reg == i) o = _rob->_rf_output->value;
+        if(i == 0) o = 0;
+        std::cout << i << ": " << o << ' ';
+      }
+      std::cout << std::endl;
+    }
     // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
     for(auto &module: _modules)
       module->sync();
-    return !_rob->to_terminate();
-    debug("Clock cycle " + std::to_string(_clk) + "ends.");
+    return true;
   }
 
   mem_val_t get_ret() const {

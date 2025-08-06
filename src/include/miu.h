@@ -149,7 +149,7 @@ private:
     } else if(_ifu_input->is_valid) {
       _nxt_regs.addr = _ifu_input->pc;
       _nxt_regs.data_len = 4; // fixed
-      _nxt_regs.clk_delay = 30;
+      _nxt_regs.clk_delay = 4;
       _nxt_stat = State::IFU_FETCH;
     }
   }

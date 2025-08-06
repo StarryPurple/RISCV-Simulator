@@ -73,6 +73,7 @@ public:
       mem_val_t result = 0;
       mem_ptr_t real_branch_pc = 0;
       bool is_branch = false;
+      bool is_load_store = false;
       uint32_t shamt = static_cast<uint32_t>(_nxt_regs.imm) & 0x1f;
 
       switch(_nxt_regs.instr_type) {
@@ -89,7 +90,7 @@ public:
         result = (static_cast<int32_t>(_nxt_regs.src1_value) < static_cast<int32_t>(_nxt_regs.src2_value)) ? 1 : 0;
         break;
       case InstrType::SLTU:
-        result = (static_cast<uint64_t>(_nxt_regs.src1_value) < static_cast<uint64_t>(_nxt_regs.src2_value)) ? 1 : 0;
+        result = (_nxt_regs.src1_value < _nxt_regs.src2_value) ? 1 : 0;
         break;
       case InstrType::XOR:
         result = _nxt_regs.src1_value ^ _nxt_regs.src2_value;
@@ -119,13 +120,13 @@ public:
         result = (static_cast<int32_t>(_nxt_regs.src1_value) < static_cast<int32_t>(_nxt_regs.imm)) ? 1 : 0;
         break;
       case InstrType::SLTIU:
-        result = (_nxt_regs.src1_value < _nxt_regs.imm) ? 1 : 0;
+        result = (static_cast<uint32_t>(_nxt_regs.src1_value) < static_cast<uint32_t>(_nxt_regs.imm)) ? 1 : 0;
         break;
       case InstrType::SRL:
-        result = static_cast<uint32_t>(_nxt_regs.src1_value) >> (_nxt_regs.src2_value & 0x1f);
+        result = _nxt_regs.src1_value >> (_nxt_regs.src2_value & 0x1f);
         break;
       case InstrType::SRLI:
-        result = static_cast<uint32_t>(_nxt_regs.src1_value) >> shamt;
+        result = _nxt_regs.src1_value >> shamt;
         break;
       case InstrType::SRA:
         result = static_cast<int32_t>(_nxt_regs.src1_value) >> (_nxt_regs.src2_value & 0x1f);
@@ -134,10 +135,10 @@ public:
         result = static_cast<int32_t>(_nxt_regs.src1_value) >> shamt;
         break;
       case InstrType::LUI:
-        result = _nxt_regs.imm << 12;
+        result = static_cast<uint32_t>(_nxt_regs.imm) << 12;
         break;
       case InstrType::AUIPC:
-        result = _nxt_regs.instr_addr + (_nxt_regs.imm << 12);
+        result = _nxt_regs.instr_addr + (static_cast<uint32_t>(_nxt_regs.imm) << 12);
         break;
       case InstrType::BEQ:
         is_branch = true;
@@ -157,7 +158,7 @@ public:
         break;
       case InstrType::BLT:
         is_branch = true;
-        if(_nxt_regs.src1_value < _nxt_regs.src2_value) {
+        if(static_cast<int32_t>(_nxt_regs.src1_value) < static_cast<int32_t>(_nxt_regs.src2_value)) {
           real_branch_pc = _nxt_regs.instr_addr + _nxt_regs.imm;
         } else {
           real_branch_pc = _nxt_regs.instr_addr + 4;
@@ -165,7 +166,7 @@ public:
         break;
       case InstrType::BGE:
         is_branch = true;
-        if(_nxt_regs.src1_value >= _nxt_regs.src2_value) {
+        if(static_cast<int32_t>(_nxt_regs.src1_value) >= static_cast<int32_t>(_nxt_regs.src2_value)) {
           real_branch_pc = _nxt_regs.instr_addr + _nxt_regs.imm;
         } else {
           real_branch_pc = _nxt_regs.instr_addr + 4;
@@ -173,7 +174,7 @@ public:
         break;
       case InstrType::BLTU:
         is_branch = true;
-        if(static_cast<uint64_t>(_nxt_regs.src1_value) < static_cast<uint64_t>(_nxt_regs.src2_value)) {
+        if(_nxt_regs.src1_value < _nxt_regs.src2_value) {
           real_branch_pc = _nxt_regs.instr_addr + _nxt_regs.imm;
         } else {
           real_branch_pc = _nxt_regs.instr_addr + 4;
@@ -181,7 +182,7 @@ public:
         break;
       case InstrType::BGEU:
         is_branch = true;
-        if(static_cast<uint64_t>(_nxt_regs.src1_value) >= static_cast<uint64_t>(_nxt_regs.src2_value)) {
+        if(_nxt_regs.src1_value >= _nxt_regs.src2_value) {
           real_branch_pc = _nxt_regs.instr_addr + _nxt_regs.imm;
         } else {
           real_branch_pc = _nxt_regs.instr_addr + 4;
@@ -205,7 +206,9 @@ public:
       case InstrType::SB:
       case InstrType::SH:
       case InstrType::SW:
+        // calculate address.
         result = _nxt_regs.src1_value + _nxt_regs.imm;
+        is_load_store = true;
         break;
       case InstrType::INVALID:
         break;
@@ -217,7 +220,8 @@ public:
         .is_valid = true,
         .rob_index = _nxt_regs.rob_index,
         .real_pc = is_branch ? real_branch_pc : 0,
-        .value = result
+        .value = result,
+        .is_load_store = is_load_store
       };
 
       _nxt_regs.is_busy = false;

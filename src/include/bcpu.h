@@ -64,7 +64,7 @@ public:
   bool tick() {
     static int cnt = 0; ++cnt;
     raw_instr_t raw_instr = read_mem(_pc, 4);
-    std::cout << std::to_string(_pc) << std::endl;
+    std::cout << _pc << std::endl;
     if(raw_instr == 0x0ff00513) return false;
     Instruction instr{raw_instr};
     auto rd = instr.rd();
@@ -188,8 +188,9 @@ public:
     case InstrType::INVALID:
       throw std::runtime_error("Invalid operation");
     }
-    if(!instr.is_br() && !instr.is_jal() && !instr.is_jalr()) _pc += 4;
     _regs[0] = 0;
+    for(int i = 0; i < 16; ++i) std::cout << i << ": " << _regs[i] << ' '; std::cout << std::endl;
+    if(!instr.is_br() && !instr.is_jal() && !instr.is_jalr()) _pc += 4;
     return true;
   }
 };

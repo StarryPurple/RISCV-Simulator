@@ -49,6 +49,8 @@ class DispatchUnit : public CPUModule {
     rob_index_t alloc_rob_index = 0;
   };
 
+  // shall be another unit, so not in the register.
+  // But if you like you can change this.
   std::array<MappingTableEntry, RFSize> _mapping_table;
 
 public:
@@ -81,21 +83,26 @@ public:
   void sync() override {
     _cur_regs = _nxt_regs;
 
-    if(_cur_regs.rob_entry_allocated_ack) {
+    // overwrite mapping table once a new reliance emerges.
+
+    // never occupy x0, since broadcast to x0 is not designed to be valid.
+    if(_cur_regs.rob_entry_allocated_ack && _cur_regs.dst_reg != 0) {
       _mapping_table[_cur_regs.dst_reg].is_ready = false;
       _mapping_table[_cur_regs.dst_reg].rob_index = _cur_regs.alloc_rob_index;
     }
 
+    // free mapping table slot only when the latest occupancy is freed.
+
     if(_cdb_input->lsb_entry.is_valid) {
-      for(std::size_t i = 0; i < RFSize; ++i) {
+      for(std::size_t i = 1; i < RFSize; ++i) {
         if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _cdb_input->lsb_entry.rob_index) {
           _mapping_table[i].is_ready = true;
         }
       }
     }
 
-    if(_cdb_input->alu_entry.is_valid) {
-      for(std::size_t i = 0; i < RFSize; ++i) {
+    if(_cdb_input->alu_entry.is_valid && !_cdb_input->alu_entry.is_load_store) {
+      for(std::size_t i = 1; i < RFSize; ++i) {
         if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _cdb_input->alu_entry.rob_index) {
           _mapping_table[i].is_ready = true;
         }
@@ -103,7 +110,7 @@ public:
     }
 
     if(_rob_input->is_commit) {
-      for(std::size_t i = 0; i < RFSize; ++i) {
+      for(std::size_t i = 1; i < RFSize; ++i) {
         if(!_mapping_table[i].is_ready && _mapping_table[i].rob_index == _rob_input->commit_index) {
           _mapping_table[i].is_ready = true;
         }
@@ -196,7 +203,7 @@ public:
       _nxt_regs.rob_request_sent = true;
       if(_rob_input->is_alloc_valid) {
         _nxt_regs.alloc_rob_index = _rob_input->rob_index;
-        _nxt_regs.rob_entry_allocated_ack = true;
+        _nxt_regs.rob_entry_allocated_ack = _nxt_regs.instr.write_rf();
 
         // fetch rf data using the old mapping table
         rf_index_t rs1_idx = _nxt_regs.instr.rs1();
@@ -251,11 +258,11 @@ public:
 
     case State::WAIT_OPERANDS: {
       if(_rf_input->is_valid) {
-        if(!_nxt_regs.src1_ready) {
+        if(_rf_input->repRi) {
           _nxt_regs.src1_value = _rf_input->Vi;
           _nxt_regs.src1_ready = true;
         }
-        if(!_nxt_regs.src2_ready) {
+        if(_rf_input->repRj) {
           _nxt_regs.src2_value = _rf_input->Vj;
           _nxt_regs.src2_ready = true;
         }

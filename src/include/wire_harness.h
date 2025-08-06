@@ -163,14 +163,16 @@ struct CDBEntry {
   // store value/rf value.
   mem_val_t value;
 
+  bool is_load_store = false; // true only when alu calculates addr for load/store
+
   auto operator<=>(const CDBEntry &) const = default;
 };
 
 // broadcaster: ALU, LSB
 // listener: ROB, RS, DU
 struct WH_CDB_OUT {
-  CDBEntry alu_entry;
   CDBEntry lsb_entry;
+  CDBEntry alu_entry;
 
   auto operator<=>(const WH_CDB_OUT &) const = default;
 };
@@ -198,6 +200,8 @@ struct WH_FLUSH_PIPELINE {
 
 struct WH_RF_DU {
   bool is_valid = false;
+
+  bool repRi = false, repRj = false;
 
   mem_val_t Vi, Vj;
 

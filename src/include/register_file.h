@@ -12,6 +12,7 @@ class RegisterFile : public CPUModule {
   };
   struct Registers {
     std::array<mem_val_t, RFSize> arr;
+    bool repRi = false, repRj = false;
     mem_val_t Vi, Vj;
   };
 public:
@@ -45,19 +46,26 @@ public:
     case State::IDLE: {
       if(_du_input->is_valid) {
         if(_du_input->reqRi) {
+          _nxt_regs.repRi = true;
           _nxt_regs.Vi = _nxt_regs.arr[_du_input->Ri];
-        }
+        } else _nxt_regs.repRi = false;
         if(_du_input->reqRj) {
+          _nxt_regs.repRj = true;
           _nxt_regs.Vj = _nxt_regs.arr[_du_input->Rj];
-        }
+        } else _nxt_regs.repRj = false;
         _nxt_stat = State::READING;
       }
     } break;
 
     case State::READING: {
-      du_output.is_valid = true;
-      du_output.Vi = _nxt_regs.Vi;
-      du_output.Vj = _nxt_regs.Vj;
+      du_output = {
+        .is_valid = true,
+        .repRi = _cur_regs.repRi,
+        .repRj = _cur_regs.repRj,
+        .Vi = _nxt_regs.Vi,
+        .Vj = _nxt_regs.Vj
+      };
+
       _nxt_stat = State::IDLE; // only broadcast for 1 cycle
     } break;
     }
@@ -70,6 +78,7 @@ public:
     return update_signal;
   }
   mem_ptr_t get_reg(int i) const {
+    if(i == 0) return 0;
     return _cur_regs.arr[i];
   }
 private:

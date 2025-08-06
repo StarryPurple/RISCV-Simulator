@@ -9,8 +9,11 @@
 
 namespace insomnia {
 
+class CPU;
+
 template <std::size_t BufSize>
 class ReorderBuffer : public CPUModule {
+  friend class CPU;
   enum class State {
     IDLE,
     FLUSHING
@@ -61,10 +64,6 @@ public:
   _flush_output(std::move(flush_output)),
   _cur_regs(), _nxt_regs(), _cur_stat(State::IDLE), _nxt_stat(State::IDLE) {}
   void sync() override {
-    if(!_cur_regs.queue.empty() && (_nxt_regs.queue.empty() || _cur_regs.queue.front().instr_addr != _nxt_regs.queue.front().instr_addr)) {
-      static int cnt = 0; ++cnt; // debug
-      std::cout << _cur_regs.queue.front().instr_addr << std::endl;
-    }
     _cur_regs = _nxt_regs;
     _cur_stat = _nxt_stat;
   }
@@ -165,9 +164,11 @@ public:
     if(_data_input->alu_entry.is_valid && _nxt_regs.queue.index_valid(_data_input->alu_entry.rob_index)) {
       auto &record = _nxt_regs.queue.at(_data_input->alu_entry.rob_index);
       if(record.is_load || record.is_store) {
+        assert(_data_input->alu_entry.is_load_store);
         // passing addr. ignore it.
         debug("Passing L/S target addr: instr addr " + std::to_string(record.instr_addr));
       } else {
+        assert(!_data_input->alu_entry.is_load_store);
         record.is_ready = true;
         if(record.is_br || record.is_jalr) {
           record.real_pc = _data_input->alu_entry.real_pc;
