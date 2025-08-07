@@ -25,6 +25,7 @@ class Predictor : public CPUModule {
 
     mem_ptr_t pred_pc;
   };
+  uint32_t _success_pred, _total_pred;
 public:
   Predictor(
     std::shared_ptr<const WH_IFU_PRED> ifu_input,
@@ -34,7 +35,8 @@ public:
   _ifu_input(std::move(ifu_input)), _rob_input(std::move(rob_input)),
   _ifu_output(std::move(ifu_output)),
   _cur_regs(), _nxt_regs(),
-  _cur_stat(State::IDLE), _nxt_stat(State::IDLE) {}
+  _cur_stat(State::IDLE), _nxt_stat(State::IDLE),
+  _success_pred(0), _total_pred(0) {}
   void sync() override {
     _cur_regs = std::move(_nxt_regs); // to reduce C++ simulation time
     _cur_stat = _nxt_stat;
@@ -48,6 +50,7 @@ public:
 
     // learn first.
     if(_rob_input->is_valid) {
+      _total_pred++; _success_pred += _rob_input->is_pred_taken;
       mem_ptr_t instr_addr = _rob_input->instr_addr;
       if(_rob_input->is_br) {
         uint8_t &bht_state = _nxt_regs.bht[instr_addr];
@@ -101,6 +104,7 @@ public:
     }
     return update_signal;
   }
+  std::pair<uint32_t, uint32_t> pred_stat() const { return {_success_pred, _total_pred}; }
 private:
   const std::shared_ptr<const WH_IFU_PRED> _ifu_input;
   const std::shared_ptr<const WH_ROB_PRED> _rob_input;

@@ -116,6 +116,38 @@ public:
         }
       }
     }
+
+
+    // temporary fix
+    // This does not match the division of sync/update
+    // But we already integrated mapping table, so that's fine.
+    // can be put into update, but laz.
+    if(_cur_regs.state == State::WAIT_OPERANDS) {
+      if(_cdb_input->lsb_entry.is_valid) {
+        if(!_cur_regs.src1_ready && _cur_regs.src1_index == _cdb_input->lsb_entry.rob_index) {
+          _cur_regs.src1_ready = true;
+          _cur_regs.src1_value = _cdb_input->lsb_entry.value;
+        }
+        if(!_cur_regs.src2_ready && _cur_regs.src2_index == _cdb_input->lsb_entry.rob_index) {
+          _cur_regs.src2_ready = true;
+          _cur_regs.src2_value = _cdb_input->lsb_entry.value;
+        }
+      }
+      if(_cdb_input->alu_entry.is_valid && !_cdb_input->alu_entry.is_load_store) {
+        if(!_cur_regs.src1_ready && _cur_regs.src1_index == _cdb_input->alu_entry.rob_index) {
+          _cur_regs.src1_ready = true;
+          _cur_regs.src1_value = _cdb_input->alu_entry.value;
+        }
+        if(!_cur_regs.src2_ready && _cur_regs.src2_index == _cdb_input->alu_entry.rob_index) {
+          _cur_regs.src2_ready = true;
+          _cur_regs.src2_value = _cdb_input->alu_entry.value;
+        }
+      }
+      if(_cur_regs.src1_ready && _cur_regs.src2_ready) {
+        _cur_regs.state = State::OPERANDS_READY;
+      }
+    }
+
   }
 
   bool update() override {
@@ -289,7 +321,7 @@ public:
         }
       }
 
-      if(_nxt_regs.src1_ready && _nxt_regs.src2_ready){
+      if(_nxt_regs.src1_ready && _nxt_regs.src2_ready) {
         _nxt_regs.state = State::OPERANDS_READY;
       }
     } break;

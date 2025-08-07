@@ -12,7 +12,7 @@ class BCPU {
 
   std::array<uint8_t, RAMSize> _mem{};
   std::array<mem_val_t, RFSize> _regs{};
-  uint64_t _clk = 0;
+  clock_t _clk = 0;
   mem_ptr_t _pc = 0;
 
   mem_val_t read_mem(mem_ptr_t addr, mptr_diff_t data_len) {
@@ -61,11 +61,15 @@ public:
     return _regs[10] & 0xff;
   }
 
+  std::pair<uint32_t, uint32_t> pred_stat() const { return {-1, -1}; }
+
+  clock_t cycles() const { return _clk; }
+
   bool tick() {
     static int cnt = 0; ++cnt;
     raw_instr_t raw_instr = read_mem(_pc, 4);
-    std::cout << _pc << std::endl;
     if(raw_instr == 0x0ff00513) return false;
+    std::cout << _pc << std::endl;
     Instruction instr{raw_instr};
     auto rd = instr.rd();
     auto rs1 = instr.rs1();
@@ -189,35 +193,10 @@ public:
       throw std::runtime_error("Invalid operation");
     }
     _regs[0] = 0;
-    for(int i = 0; i < 16; ++i) std::cout << i << ": " << _regs[i] << ' '; std::cout << std::endl;
+    // for(int i = 0; i < 16; ++i) std::cout << i << ": " << _regs[i] << ' '; std::cout << std::endl;
     if(!instr.is_br() && !instr.is_jal() && !instr.is_jalr()) _pc += 4;
     return true;
   }
 };
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

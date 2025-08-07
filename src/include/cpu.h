@@ -225,6 +225,7 @@ public:
       }
     }
     if(_rob->to_terminate()) return false;
+    /*
     if(!_rob->_cur_regs.queue.empty() &&
       (_rob->_nxt_regs.queue.empty() || _rob->_cur_regs.queue.front().instr_addr != _rob->_nxt_regs.queue.front().instr_addr)) {
       static int cnt = 0; ++cnt; // debug
@@ -238,15 +239,20 @@ public:
       }
       std::cout << std::endl;
     }
+    */
     // std::shuffle(_modules.begin(), _modules.end(), std::mt19937_64(std::random_device{}()));
     for(auto &module: _modules)
       module->sync();
     return true;
   }
 
+  std::pair<uint32_t, uint32_t> pred_stat() const { return _pred->pred_stat(); }
+
   mem_val_t get_ret() const {
     return _rf->get_reg(10) & 0xff;
   }
+
+  clock_t cycles() const { return _clk; }
 };
 
 }

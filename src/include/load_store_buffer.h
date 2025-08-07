@@ -241,7 +241,7 @@ public:
           }
         }
 
-        if(!has_reliance && !_cur_regs.load_sent) {
+        if(entry.addr_ready && !has_reliance && !_cur_regs.load_sent) {
           // load now.
           miu_output = WH_LSB_MIU{
             .is_load_request = true,
